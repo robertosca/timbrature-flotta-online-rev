@@ -15,7 +15,16 @@ from .utils import distanza_metri, verifica_assegnazione, ha_ingresso_aperto, gi
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Timbrature Cantiere Pro", version="1.0.0")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "https://timbrature-flotta-frontend-rev.onrender.com",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event("startup")
 def seed_admin():
