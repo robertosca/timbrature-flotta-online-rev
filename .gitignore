@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.db
+*.sqlite
+
+# Node
+node_modules/
+dist/
+package-lock.json
+npm-debug.log*
+
+# Local env
+.env
+.env.local
+.env.production.local
+.DS_Store
