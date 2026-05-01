@@ -78,3 +78,35 @@
 ========================= */
 .vehicle-worker-box{margin-top:20px;background:#f4f7fb;border-radius:22px;padding:18px;display:grid;gap:12px}.vehicle-worker-box h2{margin-bottom:0}.vehicle-worker-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px}.vehicle-checkin{background:#16803c;color:#fff}.vehicle-checkout{background:#b42318;color:#fff}.fuel-quick{grid-column:1 / -1;background:#f1bd7b;color:#5b3300}.active-car{display:flex;justify-content:space-between;gap:12px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:16px;padding:12px}.active-car span{color:var(--muted);font-size:13px}.modal-backdrop{position:fixed;inset:0;background:rgba(8,20,35,.72);display:grid;place-items:center;z-index:1000;padding:16px}.modal-card{width:min(560px,96vw);background:#fff;border-radius:24px;padding:18px;box-shadow:0 30px 90px rgba(0,0,0,.35)}.modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}.qr-reader{width:100%;min-height:310px;border:1px dashed var(--line);border-radius:18px;overflow:hidden;background:#f8fafc}.manual-qr{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:12px}.fleet-form{display:grid;grid-template-columns:1fr 1fr 1.3fr auto;gap:12px}.vehicle-grid-admin{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:20px}.vehicle-card-admin{background:#fff;border-radius:24px;padding:18px;box-shadow:var(--shadow)}.vehicle-card-admin h3{font-size:24px;margin-bottom:4px}.vehicle-card-admin p{color:var(--muted)}.qr-img{display:block;width:190px;height:190px;object-fit:contain;margin:14px auto}.qr-url{font-size:11px;color:var(--muted);background:#f4f7fb;border-radius:12px;padding:8px;word-break:break-all}.settings-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}.settings-grid label{display:grid;gap:6px;color:var(--ink)}
 @media(max-width:760px){.vehicle-worker-actions,.manual-qr,.fleet-form,.settings-grid{grid-template-columns:1fr}.active-car{display:block}.qr-reader{min-height:260px}}
+.route-map-box {
+  margin-top: 14px;
+  border: 1px solid #dbe4f0;
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.trip-map-card {
+  margin-top: 22px;
+  padding: 18px;
+  border: 1px solid #e1e8f2;
+  border-radius: 20px;
+  background: #ffffff;
+}
+
+.trip-map-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  color: #19324d;
+}
+
+.trip-map-head span {
+  color: #667085;
+  font-size: 14px;
+}
+
+.leaflet-container {
+  width: 100%;
+  min-height: 320px;
+}
