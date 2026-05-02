@@ -298,6 +298,7 @@ def _trip_out(db: Session, t: VehicleTrip):
         "operaio_id": t.operaio_id,
         "operaio": f"{u.nome} {u.cognome}" if u else "",
         "cantiere_id": t.cantiere_id,
+        "cantiere": c.nome if c else "",
         "start_time": t.start_time,
         "end_time": t.end_time,
         "start_latitudine": t.start_latitudine,
