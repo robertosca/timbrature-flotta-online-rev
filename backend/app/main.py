@@ -339,17 +339,62 @@ def detail_vehicle(vehicle_id: int, db: Session = Depends(get_db), user: User = 
 @app.post("/operaio/vehicle-checkin")
 def vehicle_checkin(data: VehicleCheckInput, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     v = db.query(Vehicle).filter(Vehicle.id == data.vehicle_id, Vehicle.attivo == True).first()
-    if not v: raise HTTPException(status_code=404, detail="Autovettura non trovata")
+    if not v:
+        raise HTTPException(status_code=404, detail="Autovettura non trovata")
+
+    # Controllo che l'operaio sia assegnato al cantiere selezionato
+    if data.cantiere_id:
+        assegnato = db.query(Assegnazione).filter(
+            Assegnazione.operaio_id == user.id,
+            Assegnazione.cantiere_id == data.cantiere_id,
+            (Assegnazione.data_fine == None) | (Assegnazione.data_fine >= date.today())
+        ).first()
+
+        if not assegnato:
+            raise HTTPException(
+                status_code=403,
+                detail="Non sei assegnato a questo cantiere: utilizzo autovettura non autorizzato"
+            )
+
     open_trip = db.query(VehicleTrip).filter(VehicleTrip.vehicle_id == v.id, VehicleTrip.status == "IN_CORSO").first()
-    if open_trip: raise HTTPException(status_code=400, detail="Autovettura già in uso")
+    if open_trip:
+        raise HTTPException(status_code=400, detail="Autovettura già in uso")
+
     user_open = db.query(VehicleTrip).filter(VehicleTrip.operaio_id == user.id, VehicleTrip.status == "IN_CORSO").first()
-    if user_open: raise HTTPException(status_code=400, detail="Hai già un’autovettura in uso")
-    now = datetime.now(); s = _settings(db)
+    if user_open:
+        raise HTTPException(status_code=400, detail="Hai già un’autovettura in uso")
+
+    now = datetime.now()
+    s = _settings(db)
     fuori = now.hour < s.working_start_hour or now.hour >= s.working_end_hour
-    t = VehicleTrip(vehicle_id=v.id, operaio_id=user.id, cantiere_id=data.cantiere_id, start_time=now, start_latitudine=data.latitudine, start_longitudine=data.longitudine, accuratezza_gps=data.accuratezza_gps, status="IN_CORSO", fuori_orario=fuori)
-    db.add(t); db.commit(); db.refresh(t)
-    db.add(VehicleTripPoint(trip_id=t.id, latitudine=data.latitudine, longitudine=data.longitudine, accuratezza_gps=data.accuratezza_gps))
-    v.status = "in_uso"; db.commit(); db.refresh(t)
+
+    t = VehicleTrip(
+        vehicle_id=v.id,
+        operaio_id=user.id,
+        cantiere_id=data.cantiere_id,
+        start_time=now,
+        start_latitudine=data.latitudine,
+        start_longitudine=data.longitudine,
+        accuratezza_gps=data.accuratezza_gps,
+        status="IN_CORSO",
+        fuori_orario=fuori
+    )
+
+    db.add(t)
+    db.commit()
+    db.refresh(t)
+
+    db.add(VehicleTripPoint(
+        trip_id=t.id,
+        latitudine=data.latitudine,
+        longitudine=data.longitudine,
+        accuratezza_gps=data.accuratezza_gps
+    ))
+
+    v.status = "in_uso"
+    db.commit()
+    db.refresh(t)
+
     return _trip_out(db, t)
 
 @app.post("/operaio/vehicle-point")
