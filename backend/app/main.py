@@ -317,6 +317,7 @@ def _trip_out(db: Session, t: VehicleTrip):
         "fuel_total_euro": round(fuel_total, 2),
         "expected_km_from_fuel": expected_km,
         "points_count": len(points),
+        "anomalie": ", ".join([l.evento for l in logs_auto]) if logs_auto else "",
         "points": [{"latitudine": p.latitudine, "longitudine": p.longitudine, "data_ora": p.data_ora} for p in points],
     }
 
