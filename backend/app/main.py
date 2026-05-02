@@ -285,6 +285,7 @@ def _trip_km(db: Session, trip_id: int) -> float:
 def _trip_out(db: Session, t: VehicleTrip):
     v = db.query(Vehicle).filter(Vehicle.id == t.vehicle_id).first()
     u = db.query(User).filter(User.id == t.operaio_id).first()
+    c = db.query(Cantiere).filter(Cantiere.id == t.cantiere_id).first() if t.cantiere_id else None
     points = db.query(VehicleTripPoint).filter(VehicleTripPoint.trip_id == t.id).order_by(VehicleTripPoint.data_ora).all()
     fuel_total = sum(f.amount_euro or 0 for f in db.query(FuelRecord).filter(FuelRecord.trip_id == t.id).all())
     s = _settings(db)
