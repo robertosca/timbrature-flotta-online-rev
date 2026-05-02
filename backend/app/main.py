@@ -201,8 +201,32 @@ def dashboard(db: Session = Depends(get_db), admin: User = Depends(require_admin
 @app.get("/admin/presenze")
 def presenze(data: str | None = None, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
     q = db.query(PresenzaGiornaliera).order_by(PresenzaGiornaliera.data.desc())
-    if data: q = q.filter(PresenzaGiornaliera.data == date.fromisoformat(data))
-    return q.limit(300).all()
+
+    if data:
+        q = q.filter(PresenzaGiornaliera.data == date.fromisoformat(data))
+
+    rows = q.limit(300).all()
+    out = []
+
+    for p in rows:
+        u = db.query(User).filter(User.id == p.operaio_id).first()
+        c = db.query(Cantiere).filter(Cantiere.id == p.cantiere_id).first()
+
+        out.append({
+            "id": p.id,
+            "operaio_id": p.operaio_id,
+            "operaio": f"{u.nome} {u.cognome}" if u else "",
+            "cantiere_id": p.cantiere_id,
+            "cantiere": c.nome if c else "",
+            "data": p.data,
+            "ingresso": p.ingresso,
+            "uscita": p.uscita,
+            "ore_lavorate": p.ore_lavorate,
+            "valida": p.valida,
+            "note": p.note,
+        })
+
+    return out
 
 @app.get("/admin/log-sicurezza")
 def log_sicurezza(db: Session = Depends(get_db), admin: User = Depends(require_admin)):
