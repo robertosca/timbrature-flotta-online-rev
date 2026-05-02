@@ -351,9 +351,15 @@ def vehicle_checkin(data: VehicleCheckInput, db: Session = Depends(get_db), user
         ).first()
 
         if not assegnato:
-            raise HTTPException(
-                status_code=403,
-                detail="Non sei assegnato a questo cantiere: utilizzo autovettura non autorizzato"
+            registra_log_sicurezza(
+                db,
+                user.id,
+                data.cantiere_id,
+                "AUTO_CANTIERE_NON_ASSEGNATO",
+                data.latitudine,
+                data.longitudine,
+                accuratezza_gps=data.accuratezza_gps,
+                note="L'operaio ha avviato un utilizzo auto per un cantiere a cui non risulta assegnato"
             )
 
     open_trip = db.query(VehicleTrip).filter(VehicleTrip.vehicle_id == v.id, VehicleTrip.status == "IN_CORSO").first()
