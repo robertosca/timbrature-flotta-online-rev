@@ -102,7 +102,39 @@ def assegna(data: AssegnazioneCreate, db: Session = Depends(get_db), admin: User
     db.refresh(a)
 
     return a
+@app.get("/admin/assegnazioni")
+def lista_assegnazioni(db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    rows = db.query(Assegnazione).order_by(Assegnazione.data_inizio.desc()).all()
+    out = []
 
+    for a in rows:
+        u = db.query(User).filter(User.id == a.operaio_id).first()
+        c = db.query(Cantiere).filter(Cantiere.id == a.cantiere_id).first()
+
+        out.append({
+            "id": a.id,
+            "operaio_id": a.operaio_id,
+            "operaio": f"{u.nome} {u.cognome}" if u else "",
+            "cantiere_id": a.cantiere_id,
+            "cantiere": c.nome if c else "",
+            "data_inizio": a.data_inizio,
+            "data_fine": a.data_fine,
+            "attiva": a.data_fine is None
+        })
+
+    return out
+
+@app.delete("/admin/assegnazioni/{assegnazione_id}")
+def elimina_assegnazione(assegnazione_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    a = db.query(Assegnazione).filter(Assegnazione.id == assegnazione_id).first()
+
+    if not a:
+        raise HTTPException(status_code=404, detail="Assegnazione non trovata")
+
+    db.delete(a)
+    db.commit()
+
+    return {"ok": True}
 @app.get("/operaio/cantieri")
 def cantieri_assegnati(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     oggi = date.today()
