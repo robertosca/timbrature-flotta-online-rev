@@ -824,6 +824,7 @@ function AdminOperai() {
   const [operai, setOperai] = useState([]);
   const [cantieri, setCantieri] = useState([]);
   const [toast, setToast] = useState('');
+
   const [form, setForm] = useState({
     nome: '',
     cognome: '',
@@ -832,6 +833,7 @@ function AdminOperai() {
     codice_fiscale: '',
     ruolo: 'operaio',
   });
+
   const [ass, setAss] = useState({
     operaio_id: '',
     cantiere_id: '',
@@ -858,7 +860,13 @@ function AdminOperai() {
     });
 
     setToast('Operaio creato.');
-    setForm((f) => ({ ...f, nome: '', cognome: '', email: '', codice_fiscale: '' }));
+    setForm((f) => ({
+      ...f,
+      nome: '',
+      cognome: '',
+      email: '',
+      codice_fiscale: '',
+    }));
     load();
   }
 
@@ -873,26 +881,25 @@ function AdminOperai() {
           data_fine: ass.data_fine || null,
         }),
       });
-  
+
       setToast('Assegnazione completata.');
-  
-      // 🔥 aggiorna subito i dati
       load();
-  
     } catch (e) {
       setToast(e.message || 'Errore assegnazione');
     }
   }
+
   async function eliminaAssegnazione(id) {
     if (!confirm("Rimuovere questa assegnazione?")) return;
-  
+
     await api(`/admin/assegnazioni/${id}`, {
       method: 'DELETE',
     });
-  
+
     setToast("Assegnazione rimossa");
     load();
   }
+
   return (
     <>
       <Topbar title="Operai" subtitle="Crea utenti e collega ogni operaio ai cantieri autorizzati." />
@@ -971,6 +978,36 @@ function AdminOperai() {
             { key: 'email', label: 'Email' },
             { key: 'ruolo', label: 'Ruolo' },
             { key: 'attivo', label: 'Attivo' },
+          ]}
+        />
+      </section>
+
+      <section className="panel">
+        <div className="panel-head">
+          <h2>Assegnazioni cantieri</h2>
+          <p>Elenco dei cantieri assegnati agli operai.</p>
+        </div>
+
+        <Table
+          rows={assegnazioni}
+          cols={[
+            { key: 'operaio', label: 'Operaio' },
+            { key: 'cantiere', label: 'Cantiere' },
+            { key: 'data_inizio', label: 'Inizio' },
+            { key: 'data_fine', label: 'Fine' },
+            { key: 'attiva', label: 'Attiva' },
+            {
+              key: 'azioni',
+              label: 'Azioni',
+              render: (r) => (
+                <button
+                  className="secondary"
+                  onClick={() => eliminaAssegnazione(r.id)}
+                >
+                  Rimuovi
+                </button>
+              )
+            }
           ]}
         />
       </section>
