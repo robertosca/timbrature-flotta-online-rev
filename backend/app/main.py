@@ -81,8 +81,26 @@ def modifica_cantiere(cantiere_id: int, data: CantiereCreate, db: Session = Depe
 
 @app.post("/admin/assegnazioni")
 def assegna(data: AssegnazioneCreate, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+
+    # 🔴 controllo duplicato (stesso operaio + stesso cantiere attivo)
+    esiste = db.query(Assegnazione).filter(
+        Assegnazione.operaio_id == data.operaio_id,
+        Assegnazione.cantiere_id == data.cantiere_id,
+        Assegnazione.data_fine == None
+    ).first()
+
+    if esiste:
+        raise HTTPException(
+            status_code=400,
+            detail="Operaio già assegnato a questo cantiere"
+        )
+
+    # ✅ crea assegnazione
     a = Assegnazione(**data.model_dump())
-    db.add(a); db.commit(); db.refresh(a)
+    db.add(a)
+    db.commit()
+    db.refresh(a)
+
     return a
 
 @app.get("/operaio/cantieri")
