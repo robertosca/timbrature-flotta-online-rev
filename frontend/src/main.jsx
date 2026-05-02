@@ -1208,6 +1208,7 @@ function AdminFlotta() {
           cols={[
             { key: 'targa', label: 'Auto' },
             { key: 'operaio', label: 'Operaio' },
+            { key: 'cantiere', label: 'Cantiere' },
             { key: 'start_time', label: 'Check-in', render: (r) => fmtDateTime(r.start_time) },
             { key: 'end_time', label: 'Check-out', render: (r) => fmtDateTime(r.end_time) },
             { key: 'km_stimati', label: 'Km' },
