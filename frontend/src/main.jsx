@@ -820,6 +820,7 @@ function AdminCantieri() {
 }
 
 function AdminOperai() {
+  const [assegnazioni, setAssegnazioni] = useState([]);
   const [operai, setOperai] = useState([]);
   const [cantieri, setCantieri] = useState([]);
   const [toast, setToast] = useState('');
