@@ -652,8 +652,8 @@ function Dashboard() {
             rows={pres.slice(0, 8)}
             cols={[
               { key: 'data', label: 'Data' },
-              { key: 'operaio_id', label: 'Operaio' },
-              { key: 'cantiere_id', label: 'Cantiere' },
+              { key: 'operaio', label: 'Operaio' },
+              { key: 'cantiere', label: 'Cantiere' },
               { key: 'ore_lavorate', label: 'Ore' },
               { key: 'note', label: 'Note' },
             ]}
