@@ -863,17 +863,25 @@ function AdminOperai() {
   }
 
   async function assegna() {
-    await api('/admin/assegnazioni', {
-      method: 'POST',
-      body: JSON.stringify({
-        ...ass,
-        operaio_id: Number(ass.operaio_id),
-        cantiere_id: Number(ass.cantiere_id),
-        data_fine: ass.data_fine || null,
-      }),
-    });
-
-    setToast('Assegnazione completata.');
+    try {
+      await api('/admin/assegnazioni', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...ass,
+          operaio_id: Number(ass.operaio_id),
+          cantiere_id: Number(ass.cantiere_id),
+          data_fine: ass.data_fine || null,
+        }),
+      });
+  
+      setToast('Assegnazione completata.');
+  
+      // 🔥 aggiorna subito i dati
+      load();
+  
+    } catch (e) {
+      setToast(e.message || 'Errore assegnazione');
+    }
   }
 
   return (
