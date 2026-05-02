@@ -1215,7 +1215,22 @@ function AdminFlotta() {
             { key: 'points_count', label: 'Punti GPS' },
             { key: 'fuori_orario', label: 'Fuori orario' },
             { key: 'anomalia_carburante', label: 'Anom. carburante' },
-            { key: 'anomalie', label: 'Anomalie' },
+            {
+              key: 'anomalie',
+              label: 'Anomalie',
+              render: (r) => {
+                if (!r.anomalie) return "—";
+            
+                return (
+                  <button
+                    className="secondary"
+                    onClick={() => alert(r.anomalie)}
+                  >
+                    ⚠️ Vedi
+                  </button>
+                );
+              }
+            },
             { key: 'status', label: 'Stato' },
           ]}
         />
