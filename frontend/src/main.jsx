@@ -842,6 +842,7 @@ function AdminOperai() {
   const load = () => {
     api('/admin/operai').then(setOperai);
     api('/admin/cantieri').then(setCantieri);
+    api('/admin/assegnazioni').then(setAssegnazioni);
   };
 
   useEffect(() => {
