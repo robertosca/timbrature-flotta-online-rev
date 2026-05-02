@@ -883,7 +883,16 @@ function AdminOperai() {
       setToast(e.message || 'Errore assegnazione');
     }
   }
-
+  async function eliminaAssegnazione(id) {
+    if (!confirm("Rimuovere questa assegnazione?")) return;
+  
+    await api(`/admin/assegnazioni/${id}`, {
+      method: 'DELETE',
+    });
+  
+    setToast("Assegnazione rimossa");
+    load();
+  }
   return (
     <>
       <Topbar title="Operai" subtitle="Crea utenti e collega ogni operaio ai cantieri autorizzati." />
