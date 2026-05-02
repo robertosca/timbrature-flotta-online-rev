@@ -287,6 +287,11 @@ def _trip_out(db: Session, t: VehicleTrip):
     u = db.query(User).filter(User.id == t.operaio_id).first()
     c = db.query(Cantiere).filter(Cantiere.id == t.cantiere_id).first() if t.cantiere_id else None
     points = db.query(VehicleTripPoint).filter(VehicleTripPoint.trip_id == t.id).order_by(VehicleTripPoint.data_ora).all()
+    logs_auto = db.query(LogSicurezza).filter(
+        LogSicurezza.operaio_id == t.operaio_id,
+        LogSicurezza.cantiere_id == t.cantiere_id,
+        LogSicurezza.data_ora >= t.start_time
+    ).all()
     fuel_total = sum(f.amount_euro or 0 for f in db.query(FuelRecord).filter(FuelRecord.trip_id == t.id).all())
     s = _settings(db)
     expected_km = round((fuel_total / s.fuel_price_euro_per_liter) * s.expected_km_per_liter, 2) if fuel_total else 0
