@@ -1291,7 +1291,7 @@ function AdminFlotta() {
               render: (r) => (
                 <button
                   className="primary"
-                  onClick={() => generaReport(r)}
+                  onClick={() => setReportTrip(r)}
                 >
                   📄 Vedi
                 </button>
