@@ -7,7 +7,7 @@ from calendar import monthrange
 from io import BytesIO
 from openpyxl import Workbook
 from .database import Base, engine, get_db
-from .models import User, Cantiere, Assegnazione, Timbratura, PresenzaGiornaliera, LogSicurezza
+from .models import User, Cantiere, Assegnazione, Timbratura, PresenzaGiornaliera, LogSicurezza, VehicleTrip
 from .schemas import LoginInput, UserCreate, CantiereCreate, AssegnazioneCreate, TimbraturaInput
 from .security import hash_password, verify_password, create_access_token, get_current_user, require_admin
 from .utils import distanza_metri, verifica_assegnazione, ha_ingresso_aperto, giornata_chiusa, calcola_ore, registra_log_sicurezza, SOGLIA_ACCURATEZZA_GPS
