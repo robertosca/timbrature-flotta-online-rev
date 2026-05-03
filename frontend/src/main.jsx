@@ -1299,6 +1299,18 @@ function AdminFlotta() {
           rows={tripsFiltrati}
           cols={[
             { key: 'targa', label: 'Auto' },
+            {
+              key: 'auto_view',
+              label: 'Storico auto',
+              render: (r) => (
+                <button
+                  className="secondary"
+                  onClick={() => setAutoSelezionata(r.targa)}
+                >
+                  🚗 Storico
+                </button>
+              )
+            },
             { key: 'operaio', label: 'Operaio' },
             { key: 'cantiere', label: 'Cantiere' },
             { key: 'start_time', label: 'Check-in', render: (r) => fmtDateTime(r.start_time) },
