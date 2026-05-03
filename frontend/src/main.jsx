@@ -1283,6 +1283,18 @@ function AdminFlotta() {
               }
             },
             { key: 'status', label: 'Stato' },
+            {
+              key: 'report',
+              label: 'Report',
+              render: (r) => (
+                <button
+                  className="primary"
+                  onClick={() => generaReport(r)}
+                >
+                  📄 Vedi
+                </button>
+              )
+            },
           ]}
         />
 
