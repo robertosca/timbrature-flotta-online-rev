@@ -643,6 +643,47 @@ function Dashboard() {
         <StatCard icon="⛽" label="Anom. carburante" value={fleet?.fuel_anomalies} tone="red" />
       </section>
 
+      <section className="panel">
+        <div className="panel-head">
+          <h2>Mappa operai presenti ora</h2>
+          <p>Ultima posizione GPS registrata alla timbratura di ingresso.</p>
+        </div>
+      
+        {presentiMappa.length > 0 ? (
+          <MapContainer
+            center={[
+              presentiMappa[0].latitudine || 41.9028,
+              presentiMappa[0].longitudine || 12.4964
+            ]}
+            zoom={14}
+            style={{ height: 420, borderRadius: 18 }}
+          >
+            <TileLayer
+              attribution="&copy; OpenStreetMap contributors"
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+      
+            {presentiMappa
+              .filter((p) => p.latitudine && p.longitudine)
+              .map((p) => (
+                <Marker key={p.id} position={[p.latitudine, p.longitudine]}>
+                  <Popup>
+                    <strong>{p.operaio}</strong><br />
+                    Cantiere: {p.cantiere}<br />
+                    Ingresso: {fmtDateTime(p.ingresso)}<br />
+                    Auto in uso: {p.auto_in_uso ? 'Sì' : 'No'}
+                  </Popup>
+                </Marker>
+              ))}
+          </MapContainer>
+        ) : (
+          <EmptyState
+            icon="🗺️"
+            title="Nessun operaio presente"
+            text="Quando un operaio timbra ingresso, comparirà qui sulla mappa."
+          />
+        )}
+      </section>
       <section className="split">
         <div className="panel">
           <div className="panel-head">
