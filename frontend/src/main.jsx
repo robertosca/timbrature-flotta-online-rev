@@ -1021,28 +1021,7 @@ function AdminOperai() {
           <p>Amministratori e operai abilitati.</p>
         </div>
 
-        function generaReport(trip) {
-          const testo = `
-        REPORT UTILIZZO AUTOVETTURA
-        
-        Auto: ${trip.targa}
-        Operaio: ${trip.operaio}
-        Cantiere: ${trip.cantiere || '—'}
-        
-        Check-in: ${fmtDateTime(trip.start_time)}
-        Check-out: ${fmtDateTime(trip.end_time)}
-        
-        Km stimati: ${trip.km_stimati}
-        Punti GPS: ${trip.points_count}
-        
-        Fuori orario: ${trip.fuori_orario ? 'SI' : 'NO'}
-        Anomalia carburante: ${trip.anomalia_carburante ? 'SI' : 'NO'}
-        
-        Altre anomalie: ${trip.anomalie || 'NESSUNA'}
-        `;
-        
-          alert(testo);
-        }
+       
         <Table
           rows={operai}
           cols={[
