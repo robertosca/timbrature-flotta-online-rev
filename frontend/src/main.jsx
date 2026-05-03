@@ -1267,7 +1267,7 @@ function AdminFlotta() {
         </div>
 
         <Table
-          rows={trips}
+          rows={tripsFiltrati}
           cols={[
             { key: 'targa', label: 'Auto' },
             { key: 'operaio', label: 'Operaio' },
