@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { MapContainer, TileLayer, Marker, Circle, Popup, useMapEvents, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import './style.css';
-
+import L from 'leaflet';
 const API = import.meta.env.VITE_API_URL || 'https://timbrature-flotta-online-rev.onrender.com';
 
 const menu = [
