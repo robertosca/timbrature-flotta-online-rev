@@ -1347,16 +1347,16 @@ function AdminFlotta() {
           ]}
         />
 
-        {tripsFiltrati.map((trip) => (
-          <div key={trip.id} className="trip-map-card">
+        {tripSelezionato && (
+          <div className="trip-map-card">
             <div className="trip-map-head">
-              <strong>{trip.targa}</strong>
-              <span>{trip.operaio} · {fmtDateTime(trip.start_time)}</span>
+              <strong>{tripSelezionato.targa}</strong>
+              <span>{tripSelezionato.operaio} · {fmtDateTime(tripSelezionato.start_time)}</span>
             </div>
-
-            <MappaTragitto points={trip.points} />
+        
+            <MappaTragitto points={tripSelezionato.points} />
           </div>
-        ))}
+        )}
       </section>
 
       <section className="panel">
