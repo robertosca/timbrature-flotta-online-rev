@@ -1077,6 +1077,7 @@ function AdminFlotta() {
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
   const [form, setForm] = useState({ targa: '', modello: '', descrizione: '' });
+  const [autoSelezionata, setAutoSelezionata] = useState(null);
   const [filtroAuto, setFiltroAuto] = useState('');
   const [filtroCantiere, setFiltroCantiere] = useState('');
   const [filtroOperaio, setFiltroOperaio] = useState('');
