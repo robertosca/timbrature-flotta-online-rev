@@ -1372,6 +1372,16 @@ function AdminFlotta() {
             <MappaTragitto points={tripSelezionato.points} />
           </div>
         )}
+        {autoSelezionata && (
+          <div className="trip-map-card">
+            <div className="trip-map-head">
+              <strong>{autoSelezionata}</strong>
+              <span>Storico completo tragitti auto</span>
+            </div>
+        
+            <MappaTragitto points={pointsAuto} />
+          </div>
+        )}
       </section>
 
       <section className="panel">
