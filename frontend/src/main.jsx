@@ -1136,6 +1136,7 @@ function AdminFlotta() {
     return matchAuto && matchCantiere && matchOperaio && matchData;
   });
   const tripsAuto = trips.filter(t => t.targa === autoSelezionata);
+  const pointsAuto = tripsAuto.flatMap(t => t.points || []);
   return (
     <>
       <Topbar
