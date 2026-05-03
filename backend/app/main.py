@@ -528,7 +528,45 @@ def admin_fuel(db: Session = Depends(get_db), admin: User = Depends(require_admi
     for f in db.query(FuelRecord).order_by(FuelRecord.created_at.desc()).limit(300).all():
         v = db.query(Vehicle).filter(Vehicle.id == f.vehicle_id).first()
         u = db.query(User).filter(User.id == f.operaio_id).first() if f.operaio_id else None
-        out.append({"id": f.id, "vehicle_id": f.vehicle_id, "targa": v.targa if v else "", "operaio": f"{u.nome} {u.cognome}" if u else "", "trip_id": f.trip_id, "amount_euro": f.amount_euro, "expected_km": f.expected_km, "note": f.note, "created_at": f.created_at})
+        s = _settings(db)
+
+        fuel_auto_totale = sum(
+            x.amount_euro or 0
+            for x in db.query(FuelRecord).filter(FuelRecord.vehicle_id == f.vehicle_id).all()
+        )
+        
+        km_attesi_auto = round(
+            (fuel_auto_totale / s.fuel_price_euro_per_liter) * s.expected_km_per_liter,
+            2
+        ) if fuel_auto_totale else 0
+        
+        trips_auto = db.query(VehicleTrip).filter(
+            VehicleTrip.vehicle_id == f.vehicle_id,
+            VehicleTrip.status == "CHIUSO"
+        ).all()
+        
+        km_realizzati_auto = round(
+            sum((t.km_stimati or _trip_km(db, t.id) or 0) for t in trips_auto),
+            2
+        )
+        
+        differenza_km = round(km_attesi_auto - km_realizzati_auto, 2)
+        
+        out.append({
+            "id": f.id,
+            "vehicle_id": f.vehicle_id,
+            "targa": v.targa if v else "",
+            "operaio": f"{u.nome} {u.cognome}" if u else "",
+            "trip_id": f.trip_id,
+            "amount_euro": f.amount_euro,
+            "expected_km": f.expected_km,
+            "km_attesi_auto": km_attesi_auto,
+            "km_realizzati_auto": km_realizzati_auto,
+            "differenza_km": differenza_km,
+            "anomalia": differenza_km > 50,
+            "note": f.note,
+            "created_at": f.created_at
+        })
     return out
 
 @app.get("/admin/fleet-settings")
