@@ -1073,6 +1073,7 @@ function AdminFlotta() {
   const [fuel, setFuel] = useState([]);
   const [settings, setSettings] = useState(null);
   const [report, setReport] = useState(null);
+  const [reportTrip, setReportTrip] = useState(null);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
   const [form, setForm] = useState({ targa: '', modello: '', descrizione: '' });
