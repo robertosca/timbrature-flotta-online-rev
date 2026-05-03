@@ -1077,7 +1077,10 @@ function AdminFlotta() {
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
   const [form, setForm] = useState({ targa: '', modello: '', descrizione: '' });
-
+  const [filtroAuto, setFiltroAuto] = useState('');
+  const [filtroCantiere, setFiltroCantiere] = useState('');
+  const [filtroOperaio, setFiltroOperaio] = useState('');
+  const [filtroData, setFiltroData] = useState('');
   const load = () => {
     api('/admin/vehicles').then(setVehicles).catch((e) => setErr(e.message));
     api('/admin/vehicle-trips').then(setTrips).catch(() => {});
