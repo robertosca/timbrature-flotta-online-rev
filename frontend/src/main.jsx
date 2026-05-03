@@ -1310,7 +1310,7 @@ function AdminFlotta() {
           ]}
         />
 
-        {trips.map((trip) => (
+        {tripsFiltrati.map((trip) => (
           <div key={trip.id} className="trip-map-card">
             <div className="trip-map-head">
               <strong>{trip.targa}</strong>
