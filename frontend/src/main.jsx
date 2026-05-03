@@ -1292,14 +1292,7 @@ function AdminFlotta() {
           />
         </div>
       
-        <Table
-          rows={tripsFiltrati}
-          cols={[
-            ...
-          ]}
-        />
-        
-        
+               
         <Table
           rows={tripsFiltrati}
           cols={[
