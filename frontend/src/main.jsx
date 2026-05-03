@@ -1265,7 +1265,41 @@ function AdminFlotta() {
           <h2>Storico utilizzi autovetture</h2>
           <p>Visibile solo all’amministratore.</p>
         </div>
-
+         {/* 👇 QUI INCOLLA */}
+        <div className="fleet-form" style={{ marginBottom: 14 }}>
+          <input
+            placeholder="Cerca targa auto"
+            value={filtroAuto}
+            onChange={(e) => setFiltroAuto(e.target.value)}
+          />
+      
+          <input
+            placeholder="Cerca cantiere"
+            value={filtroCantiere}
+            onChange={(e) => setFiltroCantiere(e.target.value)}
+          />
+      
+          <input
+            placeholder="Cerca operaio"
+            value={filtroOperaio}
+            onChange={(e) => setFiltroOperaio(e.target.value)}
+          />
+      
+          <input
+            type="date"
+            value={filtroData}
+            onChange={(e) => setFiltroData(e.target.value)}
+          />
+        </div>
+      
+        <Table
+          rows={tripsFiltrati}
+          cols={[
+            ...
+          ]}
+        />
+        
+        
         <Table
           rows={tripsFiltrati}
           cols={[
