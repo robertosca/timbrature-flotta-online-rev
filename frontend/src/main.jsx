@@ -1081,6 +1081,7 @@ function AdminFlotta() {
   const [filtroCantiere, setFiltroCantiere] = useState('');
   const [filtroOperaio, setFiltroOperaio] = useState('');
   const [filtroData, setFiltroData] = useState('');
+  const [tripSelezionato, setTripSelezionato] = useState(null);
   const load = () => {
     api('/admin/vehicles').then(setVehicles).catch((e) => setErr(e.message));
     api('/admin/vehicle-trips').then(setTrips).catch(() => {});
