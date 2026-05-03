@@ -1125,7 +1125,14 @@ function AdminFlotta() {
       setErr(e.message);
     }
   }
-
+  const tripsFiltrati = trips.filter((t) => {
+    const matchAuto = !filtroAuto || (t.targa || '').toLowerCase().includes(filtroAuto.toLowerCase());
+    const matchCantiere = !filtroCantiere || (t.cantiere || '').toLowerCase().includes(filtroCantiere.toLowerCase());
+    const matchOperaio = !filtroOperaio || (t.operaio || '').toLowerCase().includes(filtroOperaio.toLowerCase());
+    const matchData = !filtroData || (t.start_time || '').slice(0, 10) === filtroData;
+  
+    return matchAuto && matchCantiere && matchOperaio && matchData;
+  });
   return (
     <>
       <Topbar
