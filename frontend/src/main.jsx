@@ -1322,6 +1322,15 @@ function AdminFlotta() {
                 );
               }
             },
+            {
+              key: 'mappa',
+              label: 'Mappa',
+              render: (r) => (
+                <button className="secondary" onClick={() => setTripSelezionato(r)}>
+                  🗺️ Vedi
+                </button>
+              )
+            },
             { key: 'status', label: 'Stato' },
             {
               key: 'report',
