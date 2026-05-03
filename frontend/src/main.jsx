@@ -1327,6 +1327,34 @@ function AdminFlotta() {
           ]}
         />
       </section>
+      {/* 🔥 INCOLLA QUI */}
+      {reportTrip && (
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <div className="modal-head">
+              <h2>Report utilizzo autovettura</h2>
+              <button className="ghost" onClick={() => setReportTrip(null)}>
+                Chiudi
+              </button>
+            </div>
+      
+            <p><strong>Auto:</strong> {reportTrip.targa}</p>
+            <p><strong>Operaio:</strong> {reportTrip.operaio}</p>
+            <p><strong>Cantiere:</strong> {reportTrip.cantiere || '—'}</p>
+      
+            <p><strong>Check-in:</strong> {fmtDateTime(reportTrip.start_time)}</p>
+            <p><strong>Check-out:</strong> {fmtDateTime(reportTrip.end_time)}</p>
+      
+            <p><strong>Km stimati:</strong> {reportTrip.km_stimati}</p>
+            <p><strong>Punti GPS:</strong> {reportTrip.points_count}</p>
+      
+            <p><strong>Fuori orario:</strong> {reportTrip.fuori_orario ? 'Sì' : 'No'}</p>
+            <p><strong>Anomalia carburante:</strong> {reportTrip.anomalia_carburante ? 'Sì' : 'No'}</p>
+      
+            <p><strong>Altre anomalie:</strong> {reportTrip.anomalie || 'Nessuna'}</p>
+          </div>
+        </div>
+      )}
     </>
   );
 }
