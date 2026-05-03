@@ -1356,9 +1356,13 @@ function AdminFlotta() {
           rows={fuel}
           cols={[
             { key: 'targa', label: 'Auto' },
-            { key: 'operaio', label: 'Operaio' },
-            { key: 'amount_euro', label: 'Importo' },
-            { key: 'expected_km', label: 'Km attesi' },
+            { key: 'operaio', label: 'Operaio rifornimento' },
+            { key: 'amount_euro', label: 'Importo €' },
+            { key: 'expected_km', label: 'Km attesi rifornimento' },
+            { key: 'km_attesi_auto', label: 'Km attesi auto' },
+            { key: 'km_realizzati_auto', label: 'Km realizzati auto' },
+            { key: 'differenza_km', label: 'Differenza km' },
+            { key: 'anomalia', label: 'Anomalia' },
             { key: 'created_at', label: 'Data', render: (r) => fmtDateTime(r.created_at) },
             { key: 'note', label: 'Nota' },
           ]}
