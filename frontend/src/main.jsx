@@ -1307,7 +1307,10 @@ function AdminFlotta() {
               render: (r) => (
                 <button
                   className="secondary"
-                  onClick={() => setAutoSelezionata(r.targa)}
+                  onClick={() => {
+                    setAutoSelezionata(r.targa);
+                    setTripSelezionato(null);
+                  }}
                 >
                   🚗 Storico
                 </button>
