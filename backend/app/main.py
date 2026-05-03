@@ -227,6 +227,44 @@ def presenze(data: str | None = None, db: Session = Depends(get_db), admin: User
         })
 
     return out
+@app.get("/admin/presenti-mappa")
+def presenti_mappa(db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    oggi = date.today()
+
+    presenze = db.query(PresenzaGiornaliera).filter(
+        PresenzaGiornaliera.data == oggi,
+        PresenzaGiornaliera.ingresso != None,
+        PresenzaGiornaliera.uscita == None
+    ).all()
+
+    out = []
+
+    for p in presenze:
+        u = db.query(User).filter(User.id == p.operaio_id).first()
+        c = db.query(Cantiere).filter(Cantiere.id == p.cantiere_id).first()
+
+        ultima_timbratura = db.query(Timbratura).filter(
+            Timbratura.operaio_id == p.operaio_id,
+            Timbratura.cantiere_id == p.cantiere_id,
+            Timbratura.tipo == "ingresso"
+        ).order_by(Timbratura.data_ora.desc()).first()
+
+        auto = db.query(VehicleTrip).filter(
+            VehicleTrip.operaio_id == p.operaio_id,
+            VehicleTrip.status == "IN_CORSO"
+        ).first()
+
+        out.append({
+            "id": p.id,
+            "operaio": f"{u.nome} {u.cognome}" if u else "",
+            "cantiere": c.nome if c else "",
+            "ingresso": p.ingresso,
+            "latitudine": ultima_timbratura.latitudine if ultima_timbratura else None,
+            "longitudine": ultima_timbratura.longitudine if ultima_timbratura else None,
+            "auto_in_uso": True if auto else False,
+        })
+
+    return out
 
 @app.get("/admin/log-sicurezza")
 def log_sicurezza(db: Session = Depends(get_db), admin: User = Depends(require_admin)):
