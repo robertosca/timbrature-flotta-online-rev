@@ -615,12 +615,14 @@ function Dashboard() {
   const [logs, setLogs] = useState([]);
   const [pres, setPres] = useState([]);
   const [fleet, setFleet] = useState(null);
+  const [presentiMappa, setPresentiMappa] = useState([]);
 
   useEffect(() => {
     api('/admin/dashboard').then(setD).catch(() => {});
     api('/admin/log-sicurezza').then(setLogs).catch(() => {});
     api('/admin/presenze').then(setPres).catch(() => {});
     api('/admin/fleet-report').then(setFleet).catch(() => {});
+    api('/admin/presenti-mappa').then(setPresentiMappa).catch(() => {});
   }, []);
 
   return (
