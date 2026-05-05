@@ -21,6 +21,8 @@ class CantiereCreate(BaseModel):
     longitudine: float
     raggio_metri: int = 200
     attivo: bool = True
+    ora_inizio_attivita: str = "07:00"
+    ora_fine_attivita: str = "18:00"
 
 class AssegnazioneCreate(BaseModel):
     operaio_id: int
