@@ -447,7 +447,7 @@ def vehicle_checkin(data: VehicleCheckInput, db: Session = Depends(get_db), user
     if user_open:
         raise HTTPException(status_code=400, detail="Hai già un’autovettura in uso")
 
-    now = datetime.now()
+    now = now_italy()
     s = _settings(db)
     fuori = now.hour < s.working_start_hour or now.hour >= s.working_end_hour
 
