@@ -1047,6 +1047,7 @@ function AdminOperai() {
           <label>Operaio</label>
           <select value={ass.operaio_id} onChange={(e) => setAss({ ...ass, operaio_id: e.target.value })}>
             <option value="">Seleziona operaio</option>
+            <option value="tutti">Tutti gli operai</option>
             {operai.filter((o) => o.ruolo === 'operaio').map((o) => (
               <option key={o.id} value={o.id}>{o.cognome} {o.nome}</option>
             ))}
