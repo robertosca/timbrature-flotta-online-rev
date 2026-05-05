@@ -23,6 +23,8 @@ class Cantiere(Base):
     longitudine = Column(Float, nullable=False)
     raggio_metri = Column(Integer, default=200)
     attivo = Column(Boolean, default=True)
+    ora_inizio_attivita = Column(String, default="07:00")
+    ora_fine_attivita = Column(String, default="18:00")
 
 class Assegnazione(Base):
     __tablename__ = "assegnazioni"
