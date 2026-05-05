@@ -1530,7 +1530,12 @@ function AdminReport() {
   }, []);
 
   async function gen() {
-    setReport(await api(`/admin/report-mensile?operaio_id=${operaio}&mese=${mese}&anno=${anno}`));
+    const url =
+      operaio === 'tutti'
+        ? `/admin/report-mensile?tutti=true&mese=${mese}&anno=${anno}`
+        : `/admin/report-mensile?operaio_id=${operaio}&mese=${mese}&anno=${anno}`;
+  
+    setReport(await api(url));
   }
 
   function exp() {
