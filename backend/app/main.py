@@ -157,7 +157,7 @@ def cantieri_assegnati(db: Session = Depends(get_db), user: User = Depends(get_c
 def timbra(data: TimbraturaInput, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     if data.tipo not in ["ingresso", "uscita"]:
         raise HTTPException(status_code=400, detail="Tipo timbratura non valido")
-    now_italy()
+    now = now_italy()
     cantiere = db.query(Cantiere).filter(Cantiere.id == data.cantiere_id, Cantiere.attivo == True).first()
     if not cantiere:
         registra_log_sicurezza(db, user.id, data.cantiere_id, "CANTIERE_NON_VALIDO", data.latitudine, data.longitudine, accuratezza_gps=data.accuratezza_gps)
