@@ -863,6 +863,8 @@ function AdminCantieri() {
             { key: 'indirizzo', label: 'Indirizzo' },
             { key: 'raggio_metri', label: 'Raggio m' },
             { key: 'attivo', label: 'Attivo' },
+            { key: 'ora_inizio_attivita', label: 'Inizio' },
+            { key: 'ora_fine_attivita', label: 'Fine' },
           ]}
         />
       </section>
