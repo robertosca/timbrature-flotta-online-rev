@@ -435,7 +435,7 @@ function Operaio({ user }) {
       <section className="worker-card">
         <div className="worker-top">
           <div>
-            <p className="eyebrow">App operaio</p>
+            <p className="eyebrow">App operatore</p>
             <h1>Ciao {user.nome}</h1>
             <p className="muted">
               Timbra il cantiere e, se prendi un mezzo, scansiona il QR dentro l’autovettura.
