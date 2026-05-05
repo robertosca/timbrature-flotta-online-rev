@@ -165,6 +165,24 @@ def timbra(data: TimbraturaInput, db: Session = Depends(get_db), user: User = De
     if not verifica_assegnazione(db, user.id, data.cantiere_id):
         registra_log_sicurezza(db, user.id, data.cantiere_id, "OPERAIO_NON_ASSEGNATO", data.latitudine, data.longitudine, accuratezza_gps=data.accuratezza_gps)
         return {"valida": False, "messaggio": "Non sei assegnato a questo cantiere."}
+
+    ora_corrente = now.strftime("%H:%M")
+
+    if data.tipo == "ingresso" and ora_corrente < cantiere.ora_inizio_attivita:
+        registra_log_sicurezza(
+            db,
+            user.id,
+            data.cantiere_id,
+            "INGRESSO_ANTICIPATO",
+            data.latitudine,
+            data.longitudine,
+            accuratezza_gps=data.accuratezza_gps
+        )
+        return {
+            "valida": False,
+            "messaggio": f"Non puoi timbrare prima delle {cantiere.ora_inizio_attivita}."
+        }
+    
     if data.accuratezza_gps is None or data.accuratezza_gps > SOGLIA_ACCURATEZZA_GPS:
         registra_log_sicurezza(db, user.id, data.cantiere_id, "GPS_IMPRECISO", data.latitudine, data.longitudine, accuratezza_gps=data.accuratezza_gps)
         return {"valida": False, "messaggio": "GPS troppo impreciso. Spostati all’aperto e riprova."}
