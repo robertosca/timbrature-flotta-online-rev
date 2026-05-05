@@ -817,6 +817,26 @@ function AdminCantieri() {
             onChange={(e) => setForm({ ...form, raggio_metri: parseInt(e.target.value) })}
           />
 
+          <div className="two">
+            <div>
+              <label>Ora inizio attività</label>
+              <input
+                type="time"
+                value={form.ora_inizio_attivita || "07:00"}
+                onChange={(e) => setForm({ ...form, ora_inizio_attivita: e.target.value })}
+              />
+            </div>
+          
+            <div>
+              <label>Ora fine attività</label>
+              <input
+                type="time"
+                value={form.ora_fine_attivita || "18:00"}
+                onChange={(e) => setForm({ ...form, ora_fine_attivita: e.target.value })}
+              />
+            </div>
+          </div>
+          
           <button className="primary">Salva cantiere</button>
 
           {saved && <div className="alert success">{saved}</div>}
