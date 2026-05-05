@@ -752,6 +752,8 @@ function AdminCantieri() {
     longitudine: 12.4964,
     raggio_metri: 200,
     attivo: true,
+    ora_inizio_attivita: "07:00",
+    ora_fine_attivita: "18:00",
   });
 
   const load = () => api('/admin/cantieri').then(setCantieri);
