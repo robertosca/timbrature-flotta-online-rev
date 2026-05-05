@@ -702,6 +702,7 @@ function Dashboard() {
           <Table
             rows={pres.slice(0, 8)}
             cols={[
+              { key: 'operaio', label: 'Operaio' },
               { key: 'data', label: 'Data' },
               { key: 'operaio', label: 'Operaio' },
               { key: 'cantiere', label: 'Cantiere' },
