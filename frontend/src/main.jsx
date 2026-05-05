@@ -1550,8 +1550,12 @@ function AdminReport() {
       <section className="panel report-filter">
         <select value={operaio} onChange={(e) => setOperaio(e.target.value)}>
           <option value="">Seleziona operaio</option>
+          <option value="tutti">Tutti gli operai</option>
+        
           {operai.filter((o) => o.ruolo === 'operaio').map((o) => (
-            <option key={o.id} value={o.id}>{o.cognome} {o.nome}</option>
+            <option key={o.id} value={o.id}>
+              {o.cognome} {o.nome}
+            </option>
           ))}
         </select>
 
