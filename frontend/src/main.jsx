@@ -887,12 +887,42 @@ function AdminCantieri() {
             { key: 'attivo', label: 'Attivo' },
             { key: 'ora_inizio_attivita', label: 'Inizio' },
             { key: 'ora_fine_attivita', label: 'Fine' },
+            {
+              key: 'azioni',
+              label: 'Azioni',
+              render: (r) => (
+                <button
+                  className="secondary"
+                  onClick={() => {
+                    const nuovoInizio = prompt("Nuova ora inizio (HH:MM)", r.ora_inizio_attivita || "07:00");
+                    const nuovaFine = prompt("Nuova ora fine (HH:MM)", r.ora_fine_attivita || "18:00");
+        
+                    if (!nuovoInizio || !nuovaFine) return;
+        
+                    api(`/admin/cantieri/${r.id}`, {
+                      method: 'PUT',
+                      body: JSON.stringify({
+                        nome: r.nome,
+                        indirizzo: r.indirizzo,
+                        latitudine: r.latitudine,
+                        longitudine: r.longitudine,
+                        raggio_metri: r.raggio_metri,
+                        attivo: r.attivo,
+                        ora_inizio_attivita: nuovoInizio,
+                        ora_fine_attivita: nuovaFine,
+                      })
+                    }).then(() => {
+                      alert("Orari aggiornati");
+                      load();
+                    });
+                  }}
+                >
+                  ✏️ Modifica
+                </button>
+              )
+            }
           ]}
         />
-      </section>
-    </>
-  );
-}
 
 function AdminOperai() {
   const [assegnazioni, setAssegnazioni] = useState([]);
