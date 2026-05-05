@@ -315,10 +315,44 @@ def log_sicurezza(db: Session = Depends(get_db), admin: User = Depends(require_a
     return db.query(LogSicurezza).order_by(LogSicurezza.data_ora.desc()).limit(300).all()
 
 @app.get("/admin/report-mensile")
-def report_mensile(operaio_id: int, mese: int, anno: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
-    start = date(anno, mese, 1); end = date(anno, mese, monthrange(anno, mese)[1])
-    presenze = db.query(PresenzaGiornaliera).filter(PresenzaGiornaliera.operaio_id == operaio_id, PresenzaGiornaliera.data >= start, PresenzaGiornaliera.data <= end).order_by(PresenzaGiornaliera.data).all()
-    return {"totale_ore": round(sum(p.ore_lavorate or 0 for p in presenze), 2), "giorni": presenze}
+def report_mensile(
+    mese: int,
+    anno: int,
+    operaio_id: int | None = None,
+    tutti: bool = False,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin)
+):
+    start = date(anno, mese, 1)
+    end = date(anno, mese, monthrange(anno, mese)[1])
+
+    q = db.query(PresenzaGiornaliera).filter(
+        PresenzaGiornaliera.data >= start,
+        PresenzaGiornaliera.data <= end
+    )
+
+    if not tutti and operaio_id:
+        q = q.filter(PresenzaGiornaliera.operaio_id == operaio_id)
+
+    presenze = q.order_by(PresenzaGiornaliera.data).all()
+
+    giorni = []
+    for p in presenze:
+        u = db.query(User).filter(User.id == p.operaio_id).first()
+        giorni.append({
+            "id": p.id,
+            "operaio": f"{u.cognome} {u.nome}" if u else "",
+            "data": p.data,
+            "ingresso": p.ingresso,
+            "uscita": p.uscita,
+            "ore_lavorate": p.ore_lavorate,
+            "note": p.note,
+        })
+
+    return {
+        "totale_ore": round(sum(p.ore_lavorate or 0 for p in presenze), 2),
+        "giorni": giorni
+    }
 
 @app.get("/admin/export-presenze")
 def export_presenze(operaio_id: int, mese: int, anno: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
