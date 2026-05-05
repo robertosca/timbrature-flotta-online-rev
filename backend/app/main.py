@@ -495,17 +495,42 @@ def active_vehicle_trip(db: Session = Depends(get_db), user: User = Depends(get_
 
 @app.post("/operaio/vehicle-checkout")
 def vehicle_checkout(data: VehicleCheckoutInput, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    q = db.query(VehicleTrip).filter(VehicleTrip.operaio_id == user.id, VehicleTrip.status == "IN_CORSO")
-    if data.trip_id: q = q.filter(VehicleTrip.id == data.trip_id)
+    q = db.query(VehicleTrip).filter(
+        VehicleTrip.operaio_id == user.id,
+        VehicleTrip.status == "IN_CORSO"
+    )
+
+    if data.trip_id:
+        q = q.filter(VehicleTrip.id == data.trip_id)
+
     t = q.first()
-    if not t: raise HTTPException(status_code=404, detail="Nessun utilizzo autovettura aperto")
-    db.add(VehicleTripPoint(trip_id=t.id, latitudine=data.latitudine, longitudine=data.longitudine, accuratezza_gps=data.accuratezza_gps))
-    t.end_time = datetime.now(); t.end_latitudine = data.latitudine; t.end_longitudine = data.longitudine; t.status = "CHIUSO"
+
+    if not t:
+        raise HTTPException(status_code=404, detail="Nessun utilizzo autovettura aperto")
+
+    db.add(VehicleTripPoint(
+        trip_id=t.id,
+        latitudine=data.latitudine,
+        longitudine=data.longitudine,
+        accuratezza_gps=data.accuratezza_gps
+    ))
+
+    t.end_time = now_italy()
+    t.end_latitudine = data.latitudine
+    t.end_longitudine = data.longitudine
+    t.status = "CHIUSO"
+
     db.flush()
+
     t.km_stimati = _trip_km(db, t.id)
+
     v = db.query(Vehicle).filter(Vehicle.id == t.vehicle_id).first()
-    if v: v.status = "disponibile"
-    db.commit(); db.refresh(t)
+    if v:
+        v.status = "disponibile"
+
+    db.commit()
+    db.refresh(t)
+
     return _trip_out(db, t)
 
 @app.post("/operaio/fuel")
