@@ -923,7 +923,11 @@ function AdminCantieri() {
             }
           ]}
         />
-
+      </section>
+    </>
+  );
+}
+        
 function AdminOperai() {
   const [assegnazioni, setAssegnazioni] = useState([]);
   const [operai, setOperai] = useState([]);
