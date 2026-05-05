@@ -21,7 +21,26 @@ def now_italy():
 
 Base.metadata.create_all(bind=engine)
 
+from sqlalchemy import text
+
+def aggiorna_db():
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE cantieri ADD COLUMN ora_inizio_attivita VARCHAR DEFAULT '07:00'"))
+            conn.commit()
+        except Exception:
+            pass
+
+        try:
+            conn.execute(text("ALTER TABLE cantieri ADD COLUMN ora_fine_attivita VARCHAR DEFAULT '18:00'"))
+            conn.commit()
+        except Exception:
+            pass
+
+aggiorna_db()
+
 app = FastAPI(title="Timbrature Cantiere Pro", version="1.0.0")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
