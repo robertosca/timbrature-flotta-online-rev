@@ -484,7 +484,7 @@ function Operaio({ user }) {
 
         <div className="vehicle-worker-box">
           <h2>Autovettura aziendale</h2>
-          <p className="muted">Il tracciamento è nascosto all’operaio ma visibile all’amministratore.</p>
+          <p className="muted">Scansiona il QR dell’autovettura per registrare l’utilizzo del mezzo aziendale.</p>
 
           {vehicleTrip ? (
             <div className="active-car">
