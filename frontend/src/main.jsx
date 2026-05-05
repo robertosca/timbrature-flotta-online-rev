@@ -1016,7 +1016,7 @@ function AdminOperai() {
 
       <section className="split">
         <form onSubmit={crea} className="panel form-panel">
-          <h2>Nuovo operaio</h2>
+          <h2>Nuovo operatore</h2>
 
           <div className="two">
             <div>
