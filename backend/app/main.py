@@ -312,8 +312,25 @@ def presenti_mappa(db: Session = Depends(get_db), admin: User = Depends(require_
 
 @app.get("/admin/log-sicurezza")
 def log_sicurezza(db: Session = Depends(get_db), admin: User = Depends(require_admin)):
-    return db.query(LogSicurezza).order_by(LogSicurezza.data_ora.desc()).limit(300).all()
+    logs = db.query(LogSicurezza).order_by(LogSicurezza.data_ora.desc()).limit(300).all()
+    out = []
 
+    for l in logs:
+        u = db.query(User).filter(User.id == l.operaio_id).first() if l.operaio_id else None
+        c = db.query(Cantiere).filter(Cantiere.id == l.cantiere_id).first() if l.cantiere_id else None
+
+        out.append({
+            "id": l.id,
+            "operatore": f"{u.cognome} {u.nome}" if u else "—",
+            "cantiere": c.nome if c else "—",
+            "data_ora": l.data_ora,
+            "evento": l.evento,
+            "distanza": round(l.distanza, 2) if l.distanza is not None else None,
+            "accuratezza_gps": round(l.accuratezza_gps, 2) if l.accuratezza_gps is not None else None,
+            "note": l.note,
+        })
+
+    return out
 @app.get("/admin/report-mensile")
 def report_mensile(
     mese: int,
