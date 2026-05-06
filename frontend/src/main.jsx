@@ -722,12 +722,14 @@ function Dashboard() {
             rows={logs.slice(0, 8)}
             cols={[
               { key: 'data_ora', label: 'Ora', render: (r) => fmtDateTime(r.data_ora) },
+              { key: 'operatore', label: 'Operatore' },
+              { key: 'cantiere', label: 'Cantiere' },
               { key: 'evento', label: 'Evento' },
-              { key: 'distanza', label: 'Distanza' },
-              { key: 'accuratezza_gps', label: 'Precisione' },
+              { key: 'distanza', label: 'Distanza m' },
+              { key: 'accuratezza_gps', label: 'Precisione m' },
             ]}
           />
-        </div>
+                  </div>
       </section>
     </>
   );
