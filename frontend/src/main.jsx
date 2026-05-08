@@ -700,9 +700,8 @@ function Dashboard() {
           <Table
             rows={pres.slice(0, 8)}
             cols={[
-              { key: 'operaio', label: 'Operaio' },
               { key: 'data', label: 'Data' },
-              { key: 'operaio', label: 'Operaio' },
+              { key: 'operaio', label: 'Operatore' },
               { key: 'cantiere', label: 'Cantiere' },
               { key: 'ore_lavorate', label: 'Ore' },
               { key: 'note', label: 'Note' },
