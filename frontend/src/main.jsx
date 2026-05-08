@@ -1538,8 +1538,40 @@ function AdminReport() {
     setReport(await api(url));
   }
 
-  function exp() {
-    window.open(`${API}/admin/export-presenze?operaio_id=${operaio}&mese=${mese}&anno=${anno}`);
+  async function exp() {
+    try {
+      const token = localStorage.getItem('token');
+  
+      const response = await fetch(
+        `${API}/admin/export-presenze?operaio_id=${operaio}&mese=${mese}&anno=${anno}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+  
+      if (!response.ok) {
+        throw new Error("Errore esportazione");
+      }
+  
+      const blob = await response.blob();
+  
+      const url = window.URL.createObjectURL(blob);
+  
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `report_presenze_${mese}_${anno}.xlsx`;
+  
+      document.body.appendChild(a);
+      a.click();
+  
+      a.remove();
+      window.URL.revokeObjectURL(url);
+  
+    } catch (e) {
+      alert("Errore esportazione Excel");
+    }
   }
 
   return (
