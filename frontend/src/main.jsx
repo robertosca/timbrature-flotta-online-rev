@@ -179,9 +179,7 @@ function Login({ setSession }) {
 
         {err && <div className="alert danger-soft">{err}</div>}
 
-        <p className="hint">
-          Demo admin: <strong>admin@cantiere.local</strong> / <strong>admin123</strong>
-        </p>
+        
       </form>
     </div>
   );
