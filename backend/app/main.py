@@ -115,7 +115,7 @@ def elimina_cantiere(
     if not c:
         raise HTTPException(status_code=404, detail="Cantiere non trovato")
 
-    db.delete(c)
+    c.attivo = False
     db.commit()
 
     return {"ok": True}
