@@ -1,0 +1,9 @@
+{
+  "name": "Timbrature Cantiere Pro",
+  "short_name": "Timbrature",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#12395a",
+  "theme_color": "#12395a",
+  "icons": []
+}
