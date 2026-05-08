@@ -121,8 +121,8 @@ function MappaTragitto({ points }) {
 }
 
 function Login({ setSession }) {
-  const [email, setEmail] = useState('admin@cantiere.local');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
 
