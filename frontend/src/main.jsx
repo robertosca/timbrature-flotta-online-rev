@@ -1487,12 +1487,13 @@ function AdminFlotta() {
             { key: 'km_attesi_auto', label: 'Km attesi auto' },
             { key: 'km_realizzati_auto', label: 'Km realizzati auto' },
             { key: 'differenza_km', label: 'Differenza km' },
+        
             {
               key: 'anomalia',
               label: 'Anomalia',
               render: (r) => {
                 if (!r.anomalia) return "—";
-            
+        
                 return (
                   <span style={{
                     color: '#b42318',
@@ -1503,6 +1504,28 @@ function AdminFlotta() {
                 );
               }
             },
+        
+            {
+              key: 'delete',
+              label: 'Rimuovi',
+              render: (r) => (
+                <button
+                  className="secondary"
+                  onClick={async () => {
+                    if (!confirm("Eliminare questo rifornimento?")) return;
+        
+                    await api(`/admin/fuel/${r.id}`, {
+                      method: 'DELETE'
+                    });
+        
+                    load();
+                  }}
+                >
+                  🗑️ Elimina
+                </button>
+              )
+            },
+        
             { key: 'created_at', label: 'Data', render: (r) => fmtDateTime(r.created_at) },
             { key: 'note', label: 'Nota' },
           ]}
