@@ -104,7 +104,21 @@ def modifica_cantiere(cantiere_id: int, data: CantiereCreate, db: Session = Depe
     for k, v in data.model_dump().items(): setattr(c, k, v)
     db.commit(); db.refresh(c)
     return c
+@app.delete("/admin/cantieri/{cantiere_id}")
+def elimina_cantiere(
+    cantiere_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin)
+):
+    c = db.query(Cantiere).filter(Cantiere.id == cantiere_id).first()
 
+    if not c:
+        raise HTTPException(status_code=404, detail="Cantiere non trovato")
+
+    db.delete(c)
+    db.commit()
+
+    return {"ok": True}
 @app.post("/admin/assegnazioni")
 def assegna(data: AssegnazioneCreate, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
 
