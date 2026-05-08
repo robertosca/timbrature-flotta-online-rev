@@ -95,7 +95,7 @@ def crea_cantiere(data: CantiereCreate, db: Session = Depends(get_db), admin: Us
 
 @app.get("/admin/cantieri")
 def lista_cantieri(db: Session = Depends(get_db), admin: User = Depends(require_admin)):
-    return db.query(Cantiere).order_by(Cantiere.nome).all()
+    return db.query(Cantiere).filter(Cantiere.attivo == True).order_by(Cantiere.nome).all()
 
 @app.put("/admin/cantieri/{cantiere_id}")
 def modifica_cantiere(cantiere_id: int, data: CantiereCreate, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
