@@ -895,18 +895,11 @@ function AdminCantieri() {
                   <button
                     className="secondary"
                     onClick={() => {
-                      const nuovoInizio = prompt(
-                        "Nuova ora inizio (HH:MM)",
-                        r.ora_inizio_attivita || "07:00"
-                      );
-            
-                      const nuovaFine = prompt(
-                        "Nuova ora fine (HH:MM)",
-                        r.ora_fine_attivita || "18:00"
-                      );
-            
+                      const nuovoInizio = prompt("Nuova ora inizio (HH:MM)", r.ora_inizio_attivita || "07:00");
+                      const nuovaFine = prompt("Nuova ora fine (HH:MM)", r.ora_fine_attivita || "18:00");
+        
                       if (!nuovoInizio || !nuovaFine) return;
-            
+        
                       api(`/admin/cantieri/${r.id}`, {
                         method: 'PUT',
                         body: JSON.stringify({
@@ -927,16 +920,16 @@ function AdminCantieri() {
                   >
                     ✏️ Modifica
                   </button>
-            
+        
                   <button
                     className="secondary"
                     onClick={async () => {
                       if (!confirm(`Eliminare il cantiere "${r.nome}"?`)) return;
-            
+        
                       await api(`/admin/cantieri/${r.id}`, {
                         method: 'DELETE'
                       });
-            
+        
                       load();
                     }}
                   >
@@ -945,6 +938,12 @@ function AdminCantieri() {
                 </div>
               )
             }
+          ]}
+        />
+        </section>
+        </>
+        );
+        }
         
 function AdminOperai() {
   const [assegnazioni, setAssegnazioni] = useState([]);
