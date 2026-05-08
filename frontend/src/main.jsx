@@ -1575,6 +1575,7 @@ function AdminReport() {
           <Table
             rows={report.giorni}
             cols={[
+              { key: 'operaio', label: 'Operatore' },
               { key: 'data', label: 'Data', render: (r) => fmtDate(r.data) },
               { key: 'ingresso', label: 'Ingresso', render: (r) => fmtDateTime(r.ingresso) },
               { key: 'uscita', label: 'Uscita', render: (r) => fmtDateTime(r.uscita) },
