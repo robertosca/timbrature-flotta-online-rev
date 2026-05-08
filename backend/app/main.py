@@ -689,6 +689,49 @@ def admin_fuel(db: Session = Depends(get_db), admin: User = Depends(require_admi
         })
     return out
 
+@app.delete("/admin/vehicle-trips/{trip_id}")
+def delete_trip(
+    trip_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin)
+):
+    trip = db.query(VehicleTrip).filter(VehicleTrip.id == trip_id).first()
+
+    if not trip:
+        raise HTTPException(status_code=404, detail="Viaggio non trovato")
+
+    # elimina punti GPS
+    db.query(VehicleTripPoint).filter(
+        VehicleTripPoint.trip_id == trip.id
+    ).delete()
+
+    # elimina eventuali rifornimenti collegati
+    db.query(FuelRecord).filter(
+        FuelRecord.trip_id == trip.id
+    ).delete()
+
+    db.delete(trip)
+    db.commit()
+
+    return {"ok": True}
+    
+@app.delete("/admin/fuel/{fuel_id}")
+def delete_fuel(
+    fuel_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin)
+):
+    fuel = db.query(FuelRecord).filter(FuelRecord.id == fuel_id).first()
+
+    if not fuel:
+        raise HTTPException(status_code=404, detail="Rifornimento non trovato")
+
+    db.delete(fuel)
+    db.commit()
+
+    return {"ok": True}
+    
+
 @app.get("/admin/fleet-settings")
 def admin_fleet_settings(db: Session = Depends(get_db), admin: User = Depends(require_admin)):
     s = _settings(db)
