@@ -1415,6 +1415,28 @@ function AdminFlotta() {
               )
             },
             { key: 'status', label: 'Stato' },
+
+            {
+              key: 'rimuovi',
+              label: 'Rimuovi',
+              render: (r) => (
+                <button
+                  className="secondary"
+                  onClick={async () => {
+                    if (!confirm("Eliminare questo viaggio?")) return;
+            
+                    await api(`/admin/vehicle-trips/${r.id}`, {
+                      method: 'DELETE'
+                    });
+            
+                    load();
+                  }}
+                >
+                  🗑️ Elimina
+                </button>
+              )
+            },
+            
             {
               key: 'report',
               label: 'Report',
