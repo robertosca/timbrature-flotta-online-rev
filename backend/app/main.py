@@ -245,11 +245,16 @@ def timbra(data: TimbraturaInput, db: Session = Depends(get_db), user: User = De
         registra_log_sicurezza(db, user.id, data.cantiere_id, "GPS_IMPRECISO", data.latitudine, data.longitudine, accuratezza_gps=data.accuratezza_gps)
         return {"valida": False, "messaggio": "GPS troppo impreciso. Spostati all’aperto e riprova."}
     db.query(User).filter(User.id == user.id).with_for_update().first()
-    aperte = db.query(PresenzaGiornaliera).filter(PresenzaGiornaliera.operaio_id == user.id, PresenzaGiornaliera.ingresso != None, PresenzaGiornaliera.uscita == None).all()
+    aperte = db.query(PresenzaGiornaliera).filter(
+        PresenzaGiornaliera.operaio_id == user.id,
+        PresenzaGiornaliera.data == now.date(),
+        PresenzaGiornaliera.ingresso != None,
+        PresenzaGiornaliera.uscita == None
+    ).all()
     if data.tipo == "ingresso" and aperte:
-        return {"valida": False, "messaggio": "Chiudi prima il turno aperto."}
+        return {"valida": False, "messaggio": "Chiudi prima il turno aperto di oggi nel cantiere di ingresso."}
     if data.tipo == "uscita" and (len(aperte) != 1 or aperte[0].cantiere_id != data.cantiere_id):
-        return {"valida": False, "messaggio": "Nessun turno univoco aperto in questo cantiere. Contatta l’amministratore se necessario."}
+        return {"valida": False, "messaggio": "Nessun turno univoco aperto oggi in questo cantiere. Verifica il cantiere selezionato o contatta l’amministratore."}
     distanza = distanza_metri(data.latitudine, data.longitudine, cantiere.latitudine, cantiere.longitudine)
     valida = distanza <= min(200, cantiere.raggio_metri)
     if not valida:
