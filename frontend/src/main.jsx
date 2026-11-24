@@ -320,7 +320,7 @@ function Operaio({ user }) {
         }),
       });
 
-      setDist(data.distanza);
+      setDist(Number.isFinite(data.distanza) ? data.distanza : null);
       setTone(data.valida ? 'success' : 'danger');
       setMsg(data.messaggio);
     } catch {
@@ -471,7 +471,7 @@ function Operaio({ user }) {
           </button>
         </div>
 
-        {dist !== null && (
+        {Number.isFinite(dist) && (
           <div className="distance-card">
             <span>Distanza dal cantiere</span>
             <strong>{Math.round(dist)} m</strong>
