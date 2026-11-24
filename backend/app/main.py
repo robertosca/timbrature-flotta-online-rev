@@ -890,8 +890,9 @@ def registro_presenze(dal: date, al: date, operaio_id: int | None = None, cantie
     return [{"id":p.id,"operaio_id":u.id,"operaio":f"{u.cognome} {u.nome}","cantiere_id":c.id,"cantiere":c.nome,"data":p.data,"ingresso":p.ingresso,"uscita":p.uscita,"ore":round(p.ore_lavorate or 0,2) if p.valida and p.ingresso and p.uscita else 0,"anomalia":not bool(p.valida and p.ingresso and p.uscita),"note":p.note} for p,u,c in q.order_by(User.cognome, User.nome, PresenzaGiornaliera.data, PresenzaGiornaliera.ingresso).all()]
 
 @app.get("/admin/registro-export")
-def registro_export(dal: date, al: date, operaio_id: int | None = None, cantiere_id: int | None = None, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+def registro_export(dal: date, al: date, operaio_id: int | None = None, cantiere_id: int | None = None, soglia: float = 8, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
     rows = registro_presenze(dal, al, operaio_id, cantiere_id, db, admin)
+    if not 0 <= soglia <= 24: raise HTTPException(400,"Soglia non valida")
     wb = Workbook(); ws = wb.active; ws.title = "Dettaglio"
     ws.append(["Operaio", "Cantiere", "Data", "Ingresso", "Uscita", "Ore nette", "Anomalia", "Note"])
     for r in rows:
@@ -906,6 +907,27 @@ def registro_export(dal: date, al: date, operaio_id: int | None = None, cantiere
     for uid in sorted({r["operaio_id"] for r in rows}):
         rr=[r for r in rows if r["operaio_id"]==uid]; cal.append([rr[0]["operaio"]]+[round(sum(r["ore"] for r in rr if r["data"]==d),2) if any(r["data"]==d for r in rr) else None for d in days]+[round(sum(r["ore"] for r in rr),2)])
     cal.freeze_panes="B2"
+    costi={(c.operaio_id,c.mese):c.costo for c in db.query(CostoPaghe).all()}
+    cost=wb.create_sheet("Costi per cantiere"); cost.append(["Operaio","Cantiere","Mese","Ore nette","Tariffa EUR/h","Costo stimato EUR"])
+    gruppi={}
+    for r in rows:
+        k=(r["operaio_id"],r["operaio"],r["cantiere"],r["data"].strftime("%Y-%m")); gruppi[k]=gruppi.get(k,0)+r["ore"]
+    for (uid,nome,site,mese),ore in gruppi.items():
+        tariffa=costi.get((uid,mese)); cost.append([nome,site,mese,round(ore,2),tariffa,round(ore*tariffa,2) if tariffa is not None else None])
+    ass=wb.create_sheet("Assenze"); ass.append(["Operaio","Data","Causale","Ore","Pausa personalizzata min"])
+    q=db.query(GiornoPaghe,User).join(User,User.id==GiornoPaghe.operaio_id).filter(GiornoPaghe.data>=dal,GiornoPaghe.data<=al)
+    if operaio_id: q=q.filter(User.id==operaio_id)
+    if not cantiere_id:
+        for g,u in q.all(): ass.append([f"{u.cognome} {u.nome}",str(g.data),g.assenza,g.ore_assenza,g.pausa])
+    stra=wb.create_sheet("Ordinarie e straordinarie"); stra.append(["Operaio","Data","Ore nette","Ordinarie indicative","Straordinarie indicative","Soglia giornaliera"])
+    if not cantiere_id:
+        giornaliere={}
+        for r in rows:
+            k=(r["operaio_id"],r["operaio"],r["data"]); giornaliere[k]=giornaliere.get(k,0)+r["ore"]
+        for (_,nome,d),ore in giornaliere.items(): stra.append([nome,str(d),round(ore,2),round(min(ore,soglia),2),round(max(0,ore-soglia),2),soglia])
+    else:
+        ass.append(["Assenze non attribuite a un cantiere"]); stra.append(["Selezionare tutti i cantieri per il calcolo giornaliero"])
+
     for sheet in wb:
         for cell in sheet[1]: cell.font=__import__('openpyxl').styles.Font(bold=True)
         for row in sheet:
@@ -915,9 +937,14 @@ def registro_export(dal: date, al: date, operaio_id: int | None = None, cantiere
     return StreamingResponse(stream,media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",headers={"Content-Disposition":"attachment; filename=registro_presenze.xlsx"})
 
 
+def blocca_mese(db, giorno):
+    if db.bind.dialect.name == "postgresql":
+        db.execute(text("SELECT pg_advisory_xact_lock(:namespace, :mese)"), {"namespace": 712304, "mese": giorno.year * 100 + giorno.month})
+
 def verifica_mese_aperto(db, giorno):
+    blocca_mese(db, giorno)
     m = db.get(MesePaghe, giorno.strftime("%Y-%m"))
-    if m and m.stato == "chiuso":
+    if m and m.stato in ("chiuso", "validato"):
         raise HTTPException(409, "Mese chiuso: contattare amministratore")
 
 def pausa_giorno(db, uid, giorno):
@@ -933,6 +960,7 @@ def rettifica_paghe(pid: int, data: dict, db: Session = Depends(get_db), admin: 
     if not p or not p.ingresso: raise HTTPException(404, "Presenza non trovata")
     db.query(User).filter(User.id == p.operaio_id).with_for_update().first()
     verifica_mese_aperto(db, p.data)
+    db.refresh(p)
     motivo = str(data.get("motivo", "")).strip()
     try: uscita = datetime.fromisoformat(data["uscita"])
     except (ValueError, KeyError, TypeError): raise HTTPException(400, "Orario non valido")
@@ -946,6 +974,11 @@ def rettifica_paghe(pid: int, data: dict, db: Session = Depends(get_db), admin: 
 
 @app.put("/admin/paghe/giorno/{uid}/{giorno}")
 def modifica_giorno(uid:int, giorno:date, data:dict, db:Session=Depends(get_db), admin:User=Depends(require_admin)):
+    modifica_giorno_impl(uid, giorno, data, db, admin)
+    db.commit()
+    return {"ok":True}
+
+def modifica_giorno_impl(uid, giorno, data, db, admin):
     u=db.query(User).filter(User.id==uid, User.ruolo=="operaio").with_for_update().first()
     if not u: raise HTTPException(404,"Operaio non trovato")
     verifica_mese_aperto(db,giorno)
@@ -957,7 +990,8 @@ def modifica_giorno(uid:int, giorno:date, data:dict, db:Session=Depends(get_db),
     g.pausa=pausa;g.assenza=assenza;g.ore_assenza=ore if assenza else 0
     turni=db.query(PresenzaGiornaliera).filter_by(operaio_id=uid,data=giorno,valida=True).all()
     ripartisci_pausa_giornaliera([t for t in turni if t.ingresso and t.uscita],pausa)
-    db.commit();return {"ok":True}
+    db.flush()
+    return {"ok":True}
 
 @app.get("/admin/paghe/config")
 def config_paghe(dal:date, al:date, db:Session=Depends(get_db),admin:User=Depends(require_admin)):
@@ -977,6 +1011,7 @@ def costo_paghe(uid:int,mese:str,data:dict,db:Session=Depends(get_db),admin:User
 def stato_paghe(mese:str,data:dict,db:Session=Depends(get_db),admin:User=Depends(require_admin)):
     try: giorno=date.fromisoformat(mese+"-01")
     except ValueError: raise HTTPException(400,"Mese non valido")
+    blocca_mese(db, giorno)
     stato=data.get("stato")
     if stato not in ("aperto","validato","chiuso") or not str(data.get("motivo", "")).strip(): raise HTTPException(400,"Stato o motivo non valido")
     if stato in ("validato","chiuso"):
@@ -985,3 +1020,17 @@ def stato_paghe(mese:str,data:dict,db:Session=Depends(get_db),admin:User=Depends
     m=db.get(MesePaghe,mese)
     if not m: m=MesePaghe(mese=mese,stato="aperto");db.add(m)
     audit_paghe(db,admin,"STATO_PAGHE",f"{mese}: {m.stato} -> {stato}; {data['motivo']}");m.stato=stato;db.commit();return {"ok":True}
+
+@app.put("/admin/paghe/assenze/{uid}")
+def assenze_multiple(uid:int, data:dict, db:Session=Depends(get_db), admin:User=Depends(require_admin)):
+    try:
+        dal=date.fromisoformat(data["dal"]); al=date.fromisoformat(data["al"])
+    except (ValueError,KeyError,TypeError): raise HTTPException(400,"Periodo non valido")
+    if not 0 <= (al-dal).days <= 366: raise HTTPException(400,"Periodo non valido")
+    if data.get("assenza") not in ("FERIE","MALATTIA","PERMESSO","FESTIVITA","ASSENZA"): raise HTTPException(400,"Causale non valida")
+    n=0
+    for i in range((al-dal).days+1):
+        d=dal+timedelta(days=i)
+        if data.get("solo_feriali",True) and d.weekday()>=5: continue
+        modifica_giorno_impl(uid,d,{**data,"pausa":pausa_giorno(db,uid,d)},db,admin); n+=1
+    db.commit(); return {"ok":True,"giorni":n}
