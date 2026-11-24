@@ -186,6 +186,31 @@ def cantieri_assegnati(db: Session = Depends(get_db), user: User = Depends(get_c
     ).all()
     return rows
 
+def ripartisci_pausa_giornaliera(turni):
+    gruppi = {}
+    for t in turni:
+        gruppi.setdefault(t.cantiere_id, []).append(t)
+    lordi = {t.id: max(0, round((t.uscita - t.ingresso).total_seconds())) for t in turni}
+    capacita = {cid: sum(lordi[t.id] for t in ts) for cid, ts in gruppi.items()}
+    quote = dict.fromkeys(gruppi, 0)
+    residuo = min(3600, sum(capacita.values()))
+    while residuo:
+        disponibili = [cid for cid in sorted(gruppi) if quote[cid] < capacita[cid]]
+        if not disponibili:
+            break
+        quota = max(1, residuo // len(disponibili))
+        for cid in disponibili:
+            delta = min(quota, residuo, capacita[cid] - quote[cid])
+            quote[cid] += delta
+            residuo -= delta
+    for cid, ts in gruppi.items():
+        restante = quote[cid]
+        for t in ts:
+            detrazione = min(restante, lordi[t.id])
+            restante -= detrazione
+            t.ore_lavorate = round((lordi[t.id] - detrazione) / 3600, 2)
+            t.note = f"Turno completo - pausa detratta: {detrazione / 60:.2f} min"
+
 @app.post("/timbrature/timbra")
 def timbra(data: TimbraturaInput, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     if data.tipo not in ["ingresso", "uscita"]:
@@ -239,8 +264,16 @@ def timbra(data: TimbraturaInput, db: Session = Depends(get_db), user: User = De
     else:
         p = aperte[0]
         p.uscita = now
-        p.ore_lavorate = calcola_ore(p.ingresso, now, pausa_auto=False)
-        p.note = "Turno completo (pausa non detratta automaticamente)"
+        p.note = "Turno completo - pausa giornaliera"
+        db.flush()
+        turni = db.query(PresenzaGiornaliera).filter(
+            PresenzaGiornaliera.operaio_id == user.id,
+            PresenzaGiornaliera.data == p.data,
+            PresenzaGiornaliera.valida == True,
+            PresenzaGiornaliera.ingresso != None,
+            PresenzaGiornaliera.uscita != None
+        ).order_by(PresenzaGiornaliera.ingresso, PresenzaGiornaliera.id).all()
+        ripartisci_pausa_giornaliera(turni)
     db.commit()
     return {"valida": True, "distanza": round(distanza, 2), "messaggio": "Timbratura registrata correttamente."}
 
