@@ -1143,11 +1143,12 @@ function AdminOperai() {
   );
 }
 
+function coloreAuto(id){return ['#2563eb','#dc2626','#059669','#9333ea','#d97706','#0891b2'][Number(id||0)%6];}
 function MappaFlotta({trips}) {
   const routes = trips.map(t => ({...t, positions: (t.points || []).filter(p => p.latitudine != null && p.longitudine != null).map(p => [Number(p.latitudine), Number(p.longitudine)])})).filter(t => t.positions.length);
   const all = routes.flatMap(t => t.positions);
   function Fit() { const map = useMap(); useEffect(() => {if(all.length) map.fitBounds(all, {padding:[24,24], maxZoom:15});}, [map]); return null; }
-  return <MapContainer center={all[0] || [41.9,12.5]} zoom={all.length ? 13 : 5} style={{height:360,width:'100%',borderRadius:16,marginTop:12}}><TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/><Fit/>{routes.map(t => <React.Fragment key={t.id}><Polyline positions={t.positions}/><Marker position={t.positions[0]}><Popup>{t.targa} · {fmtDateTime(t.start_time)}</Popup></Marker>{t.positions.length > 1 && <Marker position={t.positions[t.positions.length-1]}><Popup>{t.targa} · Arrivo / ultimo punto</Popup></Marker>}</React.Fragment>)}</MapContainer>;
+  return <MapContainer center={all[0] || [41.9,12.5]} zoom={all.length ? 13 : 5} style={{height:360,width:'100%',borderRadius:16,marginTop:12}}><TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/><Fit/>{routes.map(t => <React.Fragment key={t.id}><Polyline positions={t.positions} pathOptions={{color:coloreAuto(t.vehicle_id)}}/><Marker position={t.positions[0]}><Popup>{t.targa} · {fmtDateTime(t.start_time)}</Popup></Marker>{t.positions.length > 1 && <Marker position={t.positions[t.positions.length-1]}><Popup>{t.targa} · Arrivo / ultimo punto</Popup></Marker>}</React.Fragment>)}</MapContainer>;
 }
 
 function AdminFlotta() {
@@ -1169,10 +1170,21 @@ function AdminFlotta() {
   const [cantieriAuto, setCantieriAuto] = useState([]);
   const mapRef = useRef(null);
   const [tripSelezionato, setTripSelezionato] = useState(null);
+  const [tripLoading,setTripLoading] = useState(false);
+  const [moreTrips,setMoreTrips] = useState(true);
+  const requestId = useRef(0);
+  async function loadTrips(append=false) {
+    const id=++requestId.current; setTripLoading(true);
+    const q=new URLSearchParams({offset:append?trips.length:0,limite:30,targa:filtroAuto,cantiere:filtroCantiere,operaio:filtroOperaio});
+    if(filtroData) q.set('dal',filtroData); if(filtroAl) q.set('al',filtroAl);
+    try {const r=await api('/admin/vehicle-trips?'+q); if(id===requestId.current){setTrips(old=>append?[...old,...r]:r);setMoreTrips(r.length===30);}}
+    catch(e){if(id===requestId.current)setErr(e.message);} finally {if(id===requestId.current)setTripLoading(false);}
+  }
+  useEffect(()=>{const timer=setTimeout(()=>loadTrips(),250);return ()=>{clearTimeout(timer);requestId.current++;};},[filtroAuto,filtroCantiere,filtroOperaio,filtroData,filtroAl]);
   const load = () => {
     api('/admin/cantieri').then(setCantieriAuto).catch(e => setErr(e.message));
     api('/admin/vehicles').then(setVehicles).catch((e) => setErr(e.message));
-    api('/admin/vehicle-trips').then(setTrips).catch(() => {});
+    loadTrips();
     api('/admin/fuel').then(setFuel).catch(() => {});
     api('/admin/fleet-settings').then(setSettings).catch(() => {});
     api('/admin/fleet-report').then(setReport).catch(() => {});
@@ -1355,6 +1367,7 @@ function AdminFlotta() {
       <section className="panel" ref={mapRef} style={{scrollMarginTop: 16}}>
         <div className="panel-head"><h2>Mappa autovetture</h2><p>{tripSelezionato ? tripSelezionato.targa : autoSelezionata || 'Tutti i viaggi filtrati'}</p></div>
         <button className="secondary" onClick={() => {setTripSelezionato(null); setAutoSelezionata(null);}}>Mostra tutti</button>
+        <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>{vehicles.map(v=><span key={v.id} style={{color:coloreAuto(v.id),fontWeight:700}}>● {v.targa}</span>)}</div>
         <MappaFlotta trips={tripSelezionato ? tripsFiltrati.filter(t => t.id === tripSelezionato.id) : autoSelezionata ? tripsAuto : tripsFiltrati} />
       </section>
 
@@ -1390,6 +1403,9 @@ function AdminFlotta() {
         </div>
       
                
+        {tripLoading && <p role="status">Caricamento storico autovetture in corso…</p>}
+        <p>{trips.length} viaggi caricati · la mappa mostra i viaggi caricati</p>
+        <button className="secondary" disabled={tripLoading||!moreTrips} onClick={()=>loadTrips(true)}>Carica altri viaggi</button>
         <Table
           rows={tripsFiltrati}
           cols={[
@@ -1580,114 +1596,24 @@ function AdminFlotta() {
 }
 
 function AdminReport() {
-  const [operai, setOperai] = useState([]);
-  const [report, setReport] = useState(null);
-  const [operaio, setOperaio] = useState('');
-  const [mese, setMese] = useState(new Date().getMonth() + 1);
-  const [anno, setAnno] = useState(new Date().getFullYear());
-
-  useEffect(() => {
-    api('/admin/operai').then(setOperai);
-  }, []);
-
-  async function gen() {
-    const url =
-      operaio === 'tutti'
-        ? `/admin/report-mensile?tutti=true&mese=${mese}&anno=${anno}`
-        : `/admin/report-mensile?operaio_id=${operaio}&mese=${mese}&anno=${anno}`;
-  
-    setReport(await api(url));
-  }
-
-  async function exp() {
-    try {
-      const token = localStorage.getItem('token');
-  
-      const response = await fetch(
-        `${API}/admin/export-presenze?operaio_id=${operaio}&mese=${mese}&anno=${anno}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
-      );
-  
-      if (!response.ok) {
-        throw new Error("Errore esportazione");
-      }
-  
-      const blob = await response.blob();
-  
-      const url = window.URL.createObjectURL(blob);
-  
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `report_presenze_${mese}_${anno}.xlsx`;
-  
-      document.body.appendChild(a);
-      a.click();
-  
-      a.remove();
-      window.URL.revokeObjectURL(url);
-  
-    } catch (e) {
-      alert("Errore esportazione Excel");
-    }
-  }
-
-  return (
-    <>
-      <Topbar title="Report paghe" subtitle="Genera il riepilogo mensile delle ore lavorate ed esporta in Excel." />
-
-      <section className="panel report-filter">
-        <select value={operaio} onChange={(e) => setOperaio(e.target.value)}>
-          <option value="">Seleziona operaio</option>
-          <option value="tutti">Tutti gli operai</option>
-        
-          {operai.filter((o) => o.ruolo === 'operaio').map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.cognome} {o.nome}
-            </option>
-          ))}
-        </select>
-
-        <input type="number" min="1" max="12" value={mese} onChange={(e) => setMese(e.target.value)} />
-        <input type="number" value={anno} onChange={(e) => setAnno(e.target.value)} />
-
-        <button className="primary" onClick={gen} disabled={!operaio}>Genera</button>
-        <button className="secondary" onClick={exp} disabled={!operaio}>Esporta Excel</button>
-      </section>
-
-      {report ? (
-        <section className="panel">
-          <div className="report-total">
-            <span>Totale ore mese</span>
-            <strong>{report.totale_ore}</strong>
-          </div>
-
-          <Table
-            rows={report.giorni}
-            cols={[
-              { key: 'operaio', label: 'Operatore' },
-              { key: 'cantiere', label: 'Cantiere' },
-              { key: 'data', label: 'Data', render: (r) => fmtDate(r.data) },
-              { key: 'ingresso', label: 'Ingresso', render: (r) => fmtDateTime(r.ingresso) },
-              { key: 'uscita', label: 'Uscita', render: (r) => fmtDateTime(r.uscita) },
-              { key: 'ore_lavorate', label: 'Ore' },
-              { key: 'note', label: 'Note' },
-            ]}
-            empty="Nessuna presenza nel mese"
-          />
-        </section>
-      ) : (
-        <EmptyState
-          icon="📊"
-          title="Genera un report"
-          text="Scegli operaio, mese e anno per vedere le ore utili alla busta paga."
-        />
-      )}
-    </>
-  );
+  const today=new Date(); const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const [dal,setDal]=useState(iso(new Date(today.getFullYear(),today.getMonth(),1)));
+  const [al,setAl]=useState(iso(new Date(today.getFullYear(),today.getMonth()+1,0)));
+  const [operai,setOperai]=useState([]),[cantieri,setCantieri]=useState([]),[operaio,setOperaio]=useState(''),[cantiere,setCantiere]=useState('');
+  const [rows,setRows]=useState([]),[loading,setLoading]=useState(false),[err,setErr]=useState(''),[mode,setMode]=useState('calendario');
+  const [config,setConfig]=useState({giorni:[],mesi:{},costi:[]}),[rev,setRev]=useState(0),[soglia,setSoglia]=useState(8);
+  useEffect(()=>{api('/admin/paghe/config?'+new URLSearchParams({dal,al})).then(setConfig).catch(e=>setErr(e.message));},[dal,al,rev]);
+  async function salva(path,data){try{await api(path,{method:'PUT',body:JSON.stringify(data)});setRev(v=>v+1);}catch(e){setErr(e.message);}}
+  function rettifica(r){const uscita=prompt('Uscita effettiva (AAAA-MM-GGTHH:MM)',r.uscita?.slice(0,16)||r.data+'T17:00');if(!uscita)return;const motivo=prompt('Motivo della rettifica');if(motivo)salva('/admin/paghe/rettifica/'+r.id,{uscita,motivo});}
+  function giorno(uid,d){const g=config.giorni.find(x=>x.operaio_id===Number(uid)&&x.data===d);const p=prompt('Pausa totale giornaliera in minuti',g?.pausa??60);if(p===null||p.trim()==='')return;const a=prompt('Causale: FERIE, MALATTIA, PERMESSO, FESTIVITA, ASSENZA oppure vuoto',g?.assenza||'');if(a===null)return;const h=a?prompt('Ore di assenza',g?.ore_assenza||0):'0';if(h===null)return;const motivo=prompt('Motivo della modifica');if(motivo)salva(`/admin/paghe/giorno/${uid}/${d}`,{pausa:Number(p),assenza:a.trim().toUpperCase()||null,ore_assenza:Number(h),motivo});}
+  const query=new URLSearchParams({dal,al}); if(operaio)query.set('operaio_id',operaio);if(cantiere)query.set('cantiere_id',cantiere);
+  useEffect(()=>{api('/admin/operai').then(setOperai).catch(e=>setErr(e.message));api('/admin/cantieri').then(setCantieri).catch(e=>setErr(e.message));},[]);
+  useEffect(()=>{let active=true;setLoading(true);setErr('');setRows([]);api('/admin/registro-presenze?'+query).then(r=>{if(active)setRows(r);}).catch(e=>{if(active)setErr(e.message);}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[dal,al,operaio,cantiere,rev]);
+  async function exp(){try{const r=await fetch(API+'/admin/registro-export?'+query+'&soglia='+encodeURIComponent(soglia),{headers:authHeaders()});if(!r.ok)throw Error('Esportazione non riuscita');const url=URL.createObjectURL(await r.blob());const a=document.createElement('a');a.href=url;a.download='registro_presenze.xlsx';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(e){setErr(e.message);}}
+  const workers=[...new Map([...operai.filter(o=>o.ruolo==='operaio'&&(!operaio||String(o.id)===operaio)).map(o=>[o.id,o.cognome+' '+o.nome]),...rows.map(r=>[r.operaio_id,r.operaio])]).entries()]; const sites=[...new Set(rows.map(r=>r.cantiere))];
+  const sum=rr=>rr.reduce((n,r)=>n+r.ore,0).toFixed(2); const days=[];for(let d=new Date(dal+'T12:00:00');d<=new Date(al+'T12:00:00')&&days.length<367;d.setDate(d.getDate()+1))days.push(iso(d));
+  function move(n){const d=new Date(dal+'T12:00:00');setDal(iso(new Date(d.getFullYear(),d.getMonth()+n,1)));setAl(iso(new Date(d.getFullYear(),d.getMonth()+n+1,0)));}
+  return <><Topbar title="Report paghe" subtitle="Registro presenze per periodo, operaio e cantiere"/><section className="panel"><div className="fleet-form"><button className="secondary" onClick={()=>move(-1)}>← Mese</button><label>Dal<input type="date" value={dal} onChange={e=>setDal(e.target.value)}/></label><label>Al<input type="date" value={al} onChange={e=>setAl(e.target.value)}/></label><button className="secondary" onClick={()=>move(1)}>Mese →</button><select value={operaio} onChange={e=>setOperaio(e.target.value)}><option value="">Tutti gli operai</option>{operai.filter(o=>o.ruolo==='operaio').map(o=><option key={o.id} value={o.id}>{o.cognome} {o.nome}</option>)}</select><select value={cantiere} onChange={e=>setCantiere(e.target.value)}><option value="">Tutti i cantieri</option>{cantieri.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}</select><label>Soglia straordinari indicativa (ore)<input type="number" min="0" max="24" step="0.5" value={soglia} onChange={e=>setSoglia(Number(e.target.value))}/></label><button className="primary" disabled={loading||!!err} onClick={exp}>Esporta Excel</button><button className="secondary" onClick={()=>window.print()}>Stampa / PDF</button></div>{err&&<p className="alert danger">{err}</p>}{loading&&<p>Caricamento presenze…</p>}<h2>Ore nette: {sum(rows)} · Anomalie: {rows.filter(r=>r.anomalia).length}</h2><div className="fleet-form">{['calendario','cantieri','dettaglio','anomalie','amministrazione'].map(m=><button key={m} className={mode===m?'primary':'secondary'} onClick={()=>setMode(m)}>{m}</button>)}</div></section><section className="panel" style={{overflowX:'auto'}}>{mode==='amministrazione'?<><h2>Chiusura mese {dal.slice(0,7)}</h2><p>Stato: {config.mesi[dal.slice(0,7)]||'aperto'}</p>{['validato','chiuso','aperto'].map(stato=><button key={stato} className="secondary" onClick={()=>{const motivo=prompt('Motivo cambio stato');if(motivo&&confirm('Confermi '+stato+'?'))salva('/admin/paghe/mese/'+dal.slice(0,7),{stato,motivo});}}>{stato}</button>)}<h2>Assenze cumulative</h2><button className="secondary" disabled={!operaio} onClick={()=>{const assenza=prompt('Causale FERIE, MALATTIA, PERMESSO, FESTIVITA, ASSENZA');if(!assenza)return;const h=prompt('Ore al giorno','8');if(h===null||!h.trim())return;const motivo=prompt('Motivo');if(motivo&&confirm('Registrare nel periodo selezionato, dal lunedì al venerdì?'))salva('/admin/paghe/assenze/'+operaio,{dal,al,assenza:assenza.trim().toUpperCase(),ore_assenza:Number(h),motivo,solo_feriali:true});}}>Registra assenze nel periodo (seleziona operaio)</button><h2>Costi orari per mese</h2>{workers.map(([id,name])=><p key={id}>{name} — {config.costi.find(c=>c.operaio_id===id&&c.mese===dal.slice(0,7))?.costo??'Non impostato'} €/h <button className="secondary" onClick={()=>{const costo=prompt('Costo orario aziendale in euro');if(costo!==null&&costo.trim())salva(`/admin/paghe/costo/${id}/${dal.slice(0,7)}`,{costo:Number(costo)});}}>Modifica</button></p>)}</>:mode==='calendario'?<table><thead><tr><th>Operaio</th>{days.map(d=><th key={d}>{d.slice(8)}</th>)}<th>Totale</th></tr></thead><tbody>{workers.map(([id,name])=><tr key={id}><th>{name}</th>{days.map(d=>{const rr=rows.filter(r=>r.operaio_id===id&&r.data===d);const g=config.giorni.find(x=>x.operaio_id===id&&x.data===d);return <td key={d} style={{background:rr.some(r=>r.anomalia)?'#fee2e2':undefined}}>{rr.length?<button className="secondary" title={rr.map(r=>r.cantiere+': '+r.ore+' h').join(' | ')} onClick={()=>{setOperaio(String(id));setDal(d);setAl(d);setMode('dettaglio');}}>{sum(rr)}{rr.some(r=>r.anomalia)?' !':''}</button>:'—'}{g?.assenza&&<small>{g.assenza} {g.ore_assenza}h</small>}<button className="secondary" title="Pausa e assenze" onClick={()=>giorno(id,d)}>✎</button></td>})}<td>{sum(rows.filter(r=>r.operaio_id===id))}</td></tr>)}</tbody></table>:mode==='cantieri'?<table><thead><tr><th>Operaio</th>{sites.map(c=><th key={c}>{c}</th>)}<th>Totale</th></tr></thead><tbody>{workers.map(([id,name])=><tr key={id}><th>{name}</th>{sites.map(c=><td key={c}>{sum(rows.filter(r=>r.operaio_id===id&&r.cantiere===c))}</td>)}<td>{sum(rows.filter(r=>r.operaio_id===id))}</td></tr>)}</tbody></table>:<Table rows={mode==='anomalie'?rows.filter(r=>r.anomalia):rows} cols={[{key:'operaio',label:'Operaio'},{key:'cantiere',label:'Cantiere'},{key:'data',label:'Data'},{key:'ingresso',label:'Ingresso',render:r=>fmtDateTime(r.ingresso)},{key:'uscita',label:'Uscita',render:r=>fmtDateTime(r.uscita)},{key:'ore',label:'Ore nette'},{key:'note',label:'Note'},{key:'id',label:'Rettifica',render:r=><button className="secondary" onClick={()=>rettifica(r)}>Correggi uscita</button>}]} empty="Nessuna presenza"/>}</section></>;
 }
 
 function Admin({ user, setSession }) {
