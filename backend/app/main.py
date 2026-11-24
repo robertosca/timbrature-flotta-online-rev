@@ -219,30 +219,28 @@ def timbra(data: TimbraturaInput, db: Session = Depends(get_db), user: User = De
     if data.accuratezza_gps is None or data.accuratezza_gps > SOGLIA_ACCURATEZZA_GPS:
         registra_log_sicurezza(db, user.id, data.cantiere_id, "GPS_IMPRECISO", data.latitudine, data.longitudine, accuratezza_gps=data.accuratezza_gps)
         return {"valida": False, "messaggio": "GPS troppo impreciso. Spostati all’aperto e riprova."}
-    if data.tipo == "ingresso" and ha_ingresso_aperto(db, user.id):
-        registra_log_sicurezza(db, user.id, data.cantiere_id, "DOPPIO_INGRESSO", data.latitudine, data.longitudine, accuratezza_gps=data.accuratezza_gps)
-        return {"valida": False, "messaggio": "Ingresso già registrato. Devi prima timbrare uscita."}
-    if data.tipo == "uscita" and giornata_chiusa(db, user.id):
-        registra_log_sicurezza(db, user.id, data.cantiere_id, "DOPPIA_USCITA", data.latitudine, data.longitudine, accuratezza_gps=data.accuratezza_gps)
-        return {"valida": False, "messaggio": "Uscita già registrata per oggi."}
+    db.query(User).filter(User.id == user.id).with_for_update().first()
+    aperte = db.query(PresenzaGiornaliera).filter(PresenzaGiornaliera.operaio_id == user.id, PresenzaGiornaliera.ingresso != None, PresenzaGiornaliera.uscita == None).all()
+    if data.tipo == "ingresso" and aperte:
+        return {"valida": False, "messaggio": "Chiudi prima il turno aperto."}
+    if data.tipo == "uscita" and (len(aperte) != 1 or aperte[0].cantiere_id != data.cantiere_id):
+        return {"valida": False, "messaggio": "Nessun turno univoco aperto in questo cantiere. Contatta l’amministratore se necessario."}
     distanza = distanza_metri(data.latitudine, data.longitudine, cantiere.latitudine, cantiere.longitudine)
-    valida = distanza <= cantiere.raggio_metri
+    valida = distanza <= min(200, cantiere.raggio_metri)
     if not valida:
         registra_log_sicurezza(db, user.id, data.cantiere_id, "FUORI_AREA", data.latitudine, data.longitudine, distanza, data.accuratezza_gps)
     t = Timbratura(operaio_id=user.id, cantiere_id=data.cantiere_id, tipo=data.tipo, data_ora=now, latitudine=data.latitudine, longitudine=data.longitudine, distanza=distanza, accuratezza_gps=data.accuratezza_gps, valida=valida, sospetta=not valida, motivo="OK" if valida else "Fuori area GPS", motivo_sospetto=None if valida else "Distanza superiore al raggio autorizzato")
-    db.add(t); db.commit(); db.refresh(t)
+    db.add(t)
     if not valida:
+        db.commit()
         return {"valida": False, "distanza": round(distanza, 2), "messaggio": "Timbratura rifiutata: sei fuori dall’area autorizzata."}
-    oggi = date.today()
-    p = db.query(PresenzaGiornaliera).filter(PresenzaGiornaliera.operaio_id == user.id, PresenzaGiornaliera.data == oggi).first()
     if data.tipo == "ingresso":
-        p = PresenzaGiornaliera(operaio_id=user.id, cantiere_id=data.cantiere_id, data=oggi, ingresso=now, valida=True, note="Ingresso registrato")
-        db.add(p)
+        db.add(PresenzaGiornaliera(operaio_id=user.id, cantiere_id=data.cantiere_id, data=now.date(), ingresso=now, valida=True, note="Ingresso registrato"))
     else:
-        if p and p.ingresso:
-            p.uscita = now; p.ore_lavorate = calcola_ore(p.ingresso, now); p.note = "Giornata completa"
-        else:
-            db.add(PresenzaGiornaliera(operaio_id=user.id, cantiere_id=data.cantiere_id, data=oggi, uscita=now, valida=False, note="Uscita senza ingresso"))
+        p = aperte[0]
+        p.uscita = now
+        p.ore_lavorate = calcola_ore(p.ingresso, now, pausa_auto=False)
+        p.note = "Turno completo (pausa non detratta automaticamente)"
     db.commit()
     return {"valida": True, "distanza": round(distanza, 2), "messaggio": "Timbratura registrata correttamente."}
 
@@ -373,6 +371,7 @@ def report_mensile(
         giorni.append({
             "id": p.id,
             "operaio": f"{u.cognome} {u.nome}" if u else "",
+            "cantiere": db.get(Cantiere, p.cantiere_id).nome if db.get(Cantiere, p.cantiere_id) else "",
             "data": p.data,
             "ingresso": p.ingresso,
             "uscita": p.uscita,
@@ -381,7 +380,7 @@ def report_mensile(
         })
 
     return {
-        "totale_ore": round(sum(p.ore_lavorate or 0 for p in presenze), 2),
+        "totale_ore": round(sum(p.ore_lavorate or 0 for p in presenze if p.valida and p.ingresso and p.uscita), 2),
         "giorni": giorni
     }
 
@@ -395,7 +394,7 @@ def export_presenze(operaio_id: int, mese: int, anno: int, db: Session = Depends
     ws.append(["Data", "Cantiere ID", "Ingresso", "Uscita", "Ore", "Validità", "Note"])
     totale = 0
     for p in presenze:
-        ore = p.ore_lavorate or 0; totale += ore
+        ore = (p.ore_lavorate or 0) if p.valida and p.ingresso and p.uscita else 0; totale += ore
         ws.append([p.data.strftime("%d/%m/%Y"), p.cantiere_id, p.ingresso.strftime("%H:%M") if p.ingresso else "", p.uscita.strftime("%H:%M") if p.uscita else "", ore, "OK" if p.valida else "ANOMALIA", p.note or ""])
     ws.append([]); ws.append(["Totale ore", round(totale, 2)])
     stream = BytesIO(); wb.save(stream); stream.seek(0)
@@ -515,6 +514,15 @@ def detail_vehicle(vehicle_id: int, db: Session = Depends(get_db), user: User = 
     if not v: raise HTTPException(status_code=404, detail="Autovettura non trovata")
     return {"id": v.id, "targa": v.targa, "modello": v.modello, "status": v.status}
 
+RAGGIO_AUTO = 1000
+
+def cantiere_auto(db, lat, lon):
+    if lat is None or lon is None or not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        return None
+    candidati = [(distanza_metri(lat, lon, c.latitudine, c.longitudine), c.id) for c in db.query(Cantiere).filter(Cantiere.attivo == True).all()]
+    vicino = min(candidati, default=None)
+    return vicino[1] if vicino and vicino[0] <= RAGGIO_AUTO else None
+
 @app.post("/operaio/vehicle-checkin")
 def vehicle_checkin(data: VehicleCheckInput, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     v = db.query(Vehicle).filter(Vehicle.id == data.vehicle_id, Vehicle.attivo == True).first()
@@ -556,7 +564,7 @@ def vehicle_checkin(data: VehicleCheckInput, db: Session = Depends(get_db), user
     t = VehicleTrip(
         vehicle_id=v.id,
         operaio_id=user.id,
-        cantiere_id=data.cantiere_id,
+        cantiere_id=cantiere_auto(db, data.latitudine, data.longitudine),
         start_time=now,
         start_latitudine=data.latitudine,
         start_longitudine=data.longitudine,
@@ -620,6 +628,8 @@ def vehicle_checkout(data: VehicleCheckoutInput, db: Session = Depends(get_db), 
     t.end_time = now_italy()
     t.end_latitudine = data.latitudine
     t.end_longitudine = data.longitudine
+    if t.cantiere_id is None:
+        t.cantiere_id = cantiere_auto(db, data.latitudine, data.longitudine)
     t.status = "CHIUSO"
 
     db.flush()
@@ -696,8 +706,34 @@ def operaio_fuel(data: FuelInput, db: Session = Depends(get_db), user: User = De
 
 @app.get("/admin/vehicle-trips")
 def admin_vehicle_trips(db: Session = Depends(get_db), admin: User = Depends(require_admin)):
-    trips = db.query(VehicleTrip).order_by(VehicleTrip.start_time.desc()).limit(300).all()
+    trips = db.query(VehicleTrip).order_by(VehicleTrip.start_time.desc()).all()
     return [_trip_out(db, t) for t in trips]
+
+@app.put("/admin/vehicle-trips/{trip_id}/cantiere")
+def correggi_cantiere_auto(trip_id: int, data: dict, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    t = db.get(VehicleTrip, trip_id)
+    if not t:
+        raise HTTPException(404, "Viaggio non trovato")
+    cid = data.get("cantiere_id")
+    if cid is not None and (not isinstance(cid, int) or not db.get(Cantiere, cid)):
+        raise HTTPException(400, "Cantiere non valido")
+    precedente = t.cantiere_id
+    t.cantiere_id = cid
+    db.add(LogSicurezza(operaio_id=admin.id, cantiere_id=cid, evento="CORREZIONE_CANTIERE_AUTO", note=f"Viaggio {trip_id}: {precedente} -> {cid}"))
+    db.commit()
+    return _trip_out(db, t)
+
+@app.post("/admin/vehicle-trips/recupera-cantieri")
+def recupera_cantieri_auto(db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    n = 0
+    for t in db.query(VehicleTrip).filter(VehicleTrip.cantiere_id == None).all():
+        cid = cantiere_auto(db, t.start_latitudine, t.start_longitudine) or cantiere_auto(db, t.end_latitudine, t.end_longitudine)
+        if cid is not None:
+            t.cantiere_id = cid
+            db.add(LogSicurezza(operaio_id=admin.id, cantiere_id=cid, evento="RECUPERO_CANTIERE_AUTO", note=f"Viaggio {t.id}"))
+            n += 1
+    db.commit()
+    return {"aggiornati": n}
 
 @app.get("/admin/fuel")
 def admin_fuel(db: Session = Depends(get_db), admin: User = Depends(require_admin)):
