@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { MapContainer, TileLayer, Marker, Circle, Popup, useMapEvents, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Circle, Popup, useMapEvents, useMap, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import './style.css';
 import L from 'leaflet';
@@ -1143,6 +1143,13 @@ function AdminOperai() {
   );
 }
 
+function MappaFlotta({trips}) {
+  const routes = trips.map(t => ({...t, positions: (t.points || []).filter(p => p.latitudine != null && p.longitudine != null).map(p => [Number(p.latitudine), Number(p.longitudine)])})).filter(t => t.positions.length);
+  const all = routes.flatMap(t => t.positions);
+  function Fit() { const map = useMap(); useEffect(() => {if(all.length) map.fitBounds(all, {padding:[24,24], maxZoom:15});}, [map]); return null; }
+  return <MapContainer center={all[0] || [41.9,12.5]} zoom={all.length ? 13 : 5} style={{height:360,width:'100%',borderRadius:16,marginTop:12}}><TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/><Fit/>{routes.map(t => <React.Fragment key={t.id}><Polyline positions={t.positions}/><Marker position={t.positions[0]}><Popup>{t.targa} · {fmtDateTime(t.start_time)}</Popup></Marker>{t.positions.length > 1 && <Marker position={t.positions[t.positions.length-1]}><Popup>{t.targa} · Arrivo / ultimo punto</Popup></Marker>}</React.Fragment>)}</MapContainer>;
+}
+
 function AdminFlotta() {
   const [vehicles, setVehicles] = useState([]);
   const [trips, setTrips] = useState([]);
@@ -1158,8 +1165,12 @@ function AdminFlotta() {
   const [filtroCantiere, setFiltroCantiere] = useState('');
   const [filtroOperaio, setFiltroOperaio] = useState('');
   const [filtroData, setFiltroData] = useState('');
+  const [filtroAl, setFiltroAl] = useState('');
+  const [cantieriAuto, setCantieriAuto] = useState([]);
+  const mapRef = useRef(null);
   const [tripSelezionato, setTripSelezionato] = useState(null);
   const load = () => {
+    api('/admin/cantieri').then(setCantieriAuto).catch(e => setErr(e.message));
     api('/admin/vehicles').then(setVehicles).catch((e) => setErr(e.message));
     api('/admin/vehicle-trips').then(setTrips).catch(() => {});
     api('/admin/fuel').then(setFuel).catch(() => {});
@@ -1207,11 +1218,12 @@ function AdminFlotta() {
     const matchAuto = !filtroAuto || (t.targa || '').toLowerCase().includes(filtroAuto.toLowerCase());
     const matchCantiere = !filtroCantiere || (t.cantiere || '').toLowerCase().includes(filtroCantiere.toLowerCase());
     const matchOperaio = !filtroOperaio || (t.operaio || '').toLowerCase().includes(filtroOperaio.toLowerCase());
-    const matchData = !filtroData || (t.start_time || '').slice(0, 10) === filtroData;
+    const giorno = (t.start_time || '').slice(0, 10);
+    const matchData = (!filtroData || giorno >= filtroData) && (!filtroAl || giorno <= filtroAl);
   
     return matchAuto && matchCantiere && matchOperaio && matchData;
   });
-  const tripsAuto = trips.filter(t => t.targa === autoSelezionata);
+  const tripsAuto = tripsFiltrati.filter(t => t.targa === autoSelezionata);
   const pointsAuto = tripsAuto.flatMap(t => t.points || []);
   return (
     <>
@@ -1340,6 +1352,12 @@ function AdminFlotta() {
         </section>
       )}
 
+      <section className="panel" ref={mapRef} style={{scrollMarginTop: 16}}>
+        <div className="panel-head"><h2>Mappa autovetture</h2><p>{tripSelezionato ? tripSelezionato.targa : autoSelezionata || 'Tutti i viaggi filtrati'}</p></div>
+        <button className="secondary" onClick={() => {setTripSelezionato(null); setAutoSelezionata(null);}}>Mostra tutti</button>
+        <MappaFlotta trips={tripSelezionato ? tripsFiltrati.filter(t => t.id === tripSelezionato.id) : autoSelezionata ? tripsAuto : tripsFiltrati} />
+      </section>
+
       <section className="panel">
         <div className="panel-head">
           <h2>Storico utilizzi autovetture</h2>
@@ -1365,11 +1383,10 @@ function AdminFlotta() {
             onChange={(e) => setFiltroOperaio(e.target.value)}
           />
       
-          <input
-            type="date"
-            value={filtroData}
-            onChange={(e) => setFiltroData(e.target.value)}
-          />
+          <label>Dal<input type="date" value={filtroData} onChange={e => setFiltroData(e.target.value)} /></label>
+          <label>Al<input type="date" value={filtroAl} onChange={e => setFiltroAl(e.target.value)} /></label>
+          <button className="secondary" onClick={() => {setFiltroData(''); setFiltroAl(''); setFiltroAuto(''); setFiltroCantiere(''); setFiltroOperaio('');}}>Azzera filtri</button>
+          <button className="secondary" onClick={async () => {if (!confirm('Ricalcolare solo i viaggi senza cantiere usando il raggio di 1 km?')) return; try {const r = await api('/admin/vehicle-trips/recupera-cantieri', {method:'POST'}); setMsg(`Viaggi aggiornati: ${r.aggiornati}`); load();} catch(e) {setErr(e.message);}}}>Recupera cantieri mancanti</button>
         </div>
       
                
@@ -1386,6 +1403,7 @@ function AdminFlotta() {
                   onClick={() => {
                     setAutoSelezionata(r.targa);
                     setTripSelezionato(null);
+                    mapRef.current?.scrollIntoView({behavior:"smooth"});
                   }}
                 >
                   🚗 Storico
@@ -1393,7 +1411,7 @@ function AdminFlotta() {
               )
             },
             { key: 'operaio', label: 'Operaio' },
-            { key: 'cantiere', label: 'Cantiere' },
+            { key: 'cantiere', label: 'Cantiere', render: r => <select aria-label="Correggi cantiere" value={r.cantiere_id || ''} onChange={async e => {const id = e.target.value; try {await api(`/admin/vehicle-trips/${r.id}/cantiere`, {method:'PUT', body:JSON.stringify({cantiere_id:id ? Number(id) : null})}); load();} catch(e) {setErr(e.message);}}}><option value="">Non associato</option>{cantieriAuto.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}</select> },
             { key: 'start_time', label: 'Check-in', render: (r) => fmtDateTime(r.start_time) },
             { key: 'end_time', label: 'Check-out', render: (r) => fmtDateTime(r.end_time) },
             { key: 'km_stimati', label: 'Km' },
@@ -1425,6 +1443,7 @@ function AdminFlotta() {
                   onClick={() => {
                     setTripSelezionato(r);
                     setAutoSelezionata(null);
+                    mapRef.current?.scrollIntoView({behavior:"smooth"});
                   }}
                 >
                   🗺️ Vedi
@@ -1469,26 +1488,6 @@ function AdminFlotta() {
           ]}
         />
 
-        {tripSelezionato && (
-          <div className="trip-map-card">
-            <div className="trip-map-head">
-              <strong>{tripSelezionato.targa}</strong>
-              <span>{tripSelezionato.operaio} · {fmtDateTime(tripSelezionato.start_time)}</span>
-            </div>
-        
-            <MappaTragitto points={tripSelezionato.points} />
-          </div>
-        )}
-        {autoSelezionata && (
-          <div className="trip-map-card">
-            <div className="trip-map-head">
-              <strong>{autoSelezionata}</strong>
-              <span>Storico completo tragitti auto</span>
-            </div>
-        
-            <MappaTragitto points={pointsAuto} />
-          </div>
-        )}
       </section>
 
       <section className="panel">
@@ -1670,6 +1669,7 @@ function AdminReport() {
             rows={report.giorni}
             cols={[
               { key: 'operaio', label: 'Operatore' },
+              { key: 'cantiere', label: 'Cantiere' },
               { key: 'data', label: 'Data', render: (r) => fmtDate(r.data) },
               { key: 'ingresso', label: 'Ingresso', render: (r) => fmtDateTime(r.ingresso) },
               { key: 'uscita', label: 'Uscita', render: (r) => fmtDateTime(r.uscita) },
