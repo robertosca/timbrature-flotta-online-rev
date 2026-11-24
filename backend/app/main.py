@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo
 from calendar import monthrange
 from io import BytesIO
@@ -21,7 +21,33 @@ def now_italy():
 
 Base.metadata.create_all(bind=engine)
 
-from sqlalchemy import text
+from sqlalchemy import text, Column, Integer, String, Date, Float, UniqueConstraint
+
+class GiornoPaghe(Base):
+    __tablename__ = "giorni_paghe"
+    id = Column(Integer, primary_key=True)
+    operaio_id = Column(Integer, nullable=False)
+    data = Column(Date, nullable=False)
+    pausa = Column(Integer, nullable=True)
+    assenza = Column(String, nullable=True)
+    ore_assenza = Column(Float, default=0)
+    __table_args__ = (UniqueConstraint("operaio_id", "data"),)
+
+class MesePaghe(Base):
+    __tablename__ = "mesi_paghe"
+    mese = Column(String, primary_key=True)
+    stato = Column(String, nullable=False)
+
+class CostoPaghe(Base):
+    __tablename__ = "costi_paghe"
+    id = Column(Integer, primary_key=True)
+    operaio_id = Column(Integer, nullable=False)
+    mese = Column(String, nullable=False)
+    costo = Column(Float, nullable=False)
+    __table_args__ = (UniqueConstraint("operaio_id", "mese"),)
+
+# Le nuove tabelle vengono create esplicitamente tramite migrazione, non all’avvio.
+
 
 def aggiorna_db():
     with engine.connect() as conn:
@@ -186,14 +212,14 @@ def cantieri_assegnati(db: Session = Depends(get_db), user: User = Depends(get_c
     ).all()
     return rows
 
-def ripartisci_pausa_giornaliera(turni):
+def ripartisci_pausa_giornaliera(turni, pausa=60):
     gruppi = {}
     for t in turni:
         gruppi.setdefault(t.cantiere_id, []).append(t)
     lordi = {t.id: max(0, round((t.uscita - t.ingresso).total_seconds())) for t in turni}
     capacita = {cid: sum(lordi[t.id] for t in ts) for cid, ts in gruppi.items()}
     quote = dict.fromkeys(gruppi, 0)
-    residuo = min(3600, sum(capacita.values()))
+    residuo = min(pausa * 60, sum(capacita.values()))
     while residuo:
         disponibili = [cid for cid in sorted(gruppi) if quote[cid] < capacita[cid]]
         if not disponibili:
@@ -245,6 +271,7 @@ def timbra(data: TimbraturaInput, db: Session = Depends(get_db), user: User = De
         registra_log_sicurezza(db, user.id, data.cantiere_id, "GPS_IMPRECISO", data.latitudine, data.longitudine, accuratezza_gps=data.accuratezza_gps)
         return {"valida": False, "messaggio": "GPS troppo impreciso. Spostati all’aperto e riprova."}
     db.query(User).filter(User.id == user.id).with_for_update().first()
+    verifica_mese_aperto(db, now.date())
     aperte = db.query(PresenzaGiornaliera).filter(
         PresenzaGiornaliera.operaio_id == user.id,
         PresenzaGiornaliera.data == now.date(),
@@ -278,7 +305,7 @@ def timbra(data: TimbraturaInput, db: Session = Depends(get_db), user: User = De
             PresenzaGiornaliera.ingresso != None,
             PresenzaGiornaliera.uscita != None
         ).order_by(PresenzaGiornaliera.ingresso, PresenzaGiornaliera.id).all()
-        ripartisci_pausa_giornaliera(turni)
+        ripartisci_pausa_giornaliera(turni, pausa_giorno(db, user.id, p.data))
     db.commit()
     return {"valida": True, "distanza": round(distanza, 2), "messaggio": "Timbratura registrata correttamente."}
 
@@ -743,8 +770,14 @@ def operaio_fuel(data: FuelInput, db: Session = Depends(get_db), user: User = De
     return {"id": f.id, "expected_km": f.expected_km, "amount_euro": f.amount_euro}
 
 @app.get("/admin/vehicle-trips")
-def admin_vehicle_trips(db: Session = Depends(get_db), admin: User = Depends(require_admin)):
-    trips = db.query(VehicleTrip).order_by(VehicleTrip.start_time.desc()).all()
+def admin_vehicle_trips(dal: date | None = None, al: date | None = None, offset: int = 0, limite: int = 30, targa: str = "", cantiere: str = "", operaio: str = "", db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    q = db.query(VehicleTrip).join(Vehicle, Vehicle.id == VehicleTrip.vehicle_id).join(User, User.id == VehicleTrip.operaio_id).outerjoin(Cantiere, Cantiere.id == VehicleTrip.cantiere_id)
+    if dal: q = q.filter(VehicleTrip.start_time >= datetime.combine(dal, datetime.min.time()))
+    if al: q = q.filter(VehicleTrip.start_time < datetime.combine(al + timedelta(days=1), datetime.min.time()))
+    if targa: q = q.filter(Vehicle.targa.ilike(f"%{targa}%"))
+    if cantiere: q = q.filter(Cantiere.nome.ilike(f"%{cantiere}%"))
+    if operaio: q = q.filter((User.nome + " " + User.cognome).ilike(f"%{operaio}%"))
+    trips = q.order_by(VehicleTrip.start_time.desc(), VehicleTrip.id.desc()).offset(max(0, offset)).limit(max(1, min(limite, 100))).all()
     return [_trip_out(db, t) for t in trips]
 
 @app.put("/admin/vehicle-trips/{trip_id}/cantiere")
@@ -845,3 +878,110 @@ def fleet_report(db: Session = Depends(get_db), admin: User = Depends(require_ad
         "fuel_anomalies": sum(1 for t in trips if t.anomalia_carburante),
         "outside_working_hours": sum(1 for t in trips if t.fuori_orario),
     }
+
+
+@app.get("/admin/registro-presenze")
+def registro_presenze(dal: date, al: date, operaio_id: int | None = None, cantiere_id: int | None = None, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    if al < dal or (al-dal).days > 366:
+        raise HTTPException(400, "Periodo non valido (massimo 367 giorni)")
+    q = db.query(PresenzaGiornaliera, User, Cantiere).join(User, User.id == PresenzaGiornaliera.operaio_id).join(Cantiere, Cantiere.id == PresenzaGiornaliera.cantiere_id).filter(PresenzaGiornaliera.data >= dal, PresenzaGiornaliera.data <= al)
+    if operaio_id: q = q.filter(User.id == operaio_id)
+    if cantiere_id: q = q.filter(Cantiere.id == cantiere_id)
+    return [{"id":p.id,"operaio_id":u.id,"operaio":f"{u.cognome} {u.nome}","cantiere_id":c.id,"cantiere":c.nome,"data":p.data,"ingresso":p.ingresso,"uscita":p.uscita,"ore":round(p.ore_lavorate or 0,2) if p.valida and p.ingresso and p.uscita else 0,"anomalia":not bool(p.valida and p.ingresso and p.uscita),"note":p.note} for p,u,c in q.order_by(User.cognome, User.nome, PresenzaGiornaliera.data, PresenzaGiornaliera.ingresso).all()]
+
+@app.get("/admin/registro-export")
+def registro_export(dal: date, al: date, operaio_id: int | None = None, cantiere_id: int | None = None, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    rows = registro_presenze(dal, al, operaio_id, cantiere_id, db, admin)
+    wb = Workbook(); ws = wb.active; ws.title = "Dettaglio"
+    ws.append(["Operaio", "Cantiere", "Data", "Ingresso", "Uscita", "Ore nette", "Anomalia", "Note"])
+    for r in rows:
+        ws.append([r["operaio"],r["cantiere"],str(r["data"]),str(r["ingresso"] or ""),str(r["uscita"] or ""),r["ore"],"SI" if r["anomalia"] else "NO",r["note"] or ""])
+    ws.freeze_panes = "C2"; ws.auto_filter.ref = ws.dimensions
+    rie = wb.create_sheet("Operai e cantieri"); rie.append(["Operaio","Cantiere","Ore nette"])
+    totals = {}
+    for r in rows:
+        k=(r["operaio_id"],r["cantiere_id"],r["operaio"],r["cantiere"]); totals[k]=totals.get(k,0)+r["ore"]
+    for k,v in totals.items(): rie.append([k[2],k[3],round(v,2)])
+    cal=wb.create_sheet("Calendario"); days=[dal+timedelta(days=i) for i in range((al-dal).days+1)]; cal.append(["Operaio"]+[str(d) for d in days]+["Totale"])
+    for uid in sorted({r["operaio_id"] for r in rows}):
+        rr=[r for r in rows if r["operaio_id"]==uid]; cal.append([rr[0]["operaio"]]+[round(sum(r["ore"] for r in rr if r["data"]==d),2) if any(r["data"]==d for r in rr) else None for d in days]+[round(sum(r["ore"] for r in rr),2)])
+    cal.freeze_panes="B2"
+    for sheet in wb:
+        for cell in sheet[1]: cell.font=__import__('openpyxl').styles.Font(bold=True)
+        for row in sheet:
+            for cell in row:
+                if cell.data_type == 'f': cell.data_type='s'
+    stream=BytesIO(); wb.save(stream); stream.seek(0)
+    return StreamingResponse(stream,media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",headers={"Content-Disposition":"attachment; filename=registro_presenze.xlsx"})
+
+
+def verifica_mese_aperto(db, giorno):
+    m = db.get(MesePaghe, giorno.strftime("%Y-%m"))
+    if m and m.stato == "chiuso":
+        raise HTTPException(409, "Mese chiuso: contattare amministratore")
+
+def pausa_giorno(db, uid, giorno):
+    g = db.query(GiornoPaghe).filter_by(operaio_id=uid, data=giorno).first()
+    return g.pausa if g and g.pausa is not None else 60
+
+def audit_paghe(db, admin, evento, note):
+    db.add(LogSicurezza(operaio_id=admin.id, evento=evento, note=note))
+
+@app.put("/admin/paghe/rettifica/{pid}")
+def rettifica_paghe(pid: int, data: dict, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    p = db.get(PresenzaGiornaliera, pid)
+    if not p or not p.ingresso: raise HTTPException(404, "Presenza non trovata")
+    db.query(User).filter(User.id == p.operaio_id).with_for_update().first()
+    verifica_mese_aperto(db, p.data)
+    motivo = str(data.get("motivo", "")).strip()
+    try: uscita = datetime.fromisoformat(data["uscita"])
+    except (ValueError, KeyError, TypeError): raise HTTPException(400, "Orario non valido")
+    if not motivo or uscita.tzinfo or uscita.date() != p.data or uscita <= p.ingresso or uscita > now_italy(): raise HTTPException(400, "Uscita o motivazione non valida")
+    altri = db.query(PresenzaGiornaliera).filter_by(operaio_id=p.operaio_id, data=p.data).all()
+    if any(t.id != p.id and t.ingresso and t.ingresso < uscita and (not t.uscita or t.uscita > p.ingresso) for t in altri): raise HTTPException(409, "Turni sovrapposti")
+    audit_paghe(db, admin, "RETTIFICA_PRESENZA", f"ID {pid}: uscita {p.uscita} -> {uscita}; ore precedenti {p.ore_lavorate}; {motivo}")
+    p.uscita=uscita; p.valida=True
+    ripartisci_pausa_giornaliera([t for t in altri if t.valida and t.ingresso and t.uscita], pausa_giorno(db,p.operaio_id,p.data))
+    db.commit(); return {"ok":True}
+
+@app.put("/admin/paghe/giorno/{uid}/{giorno}")
+def modifica_giorno(uid:int, giorno:date, data:dict, db:Session=Depends(get_db), admin:User=Depends(require_admin)):
+    u=db.query(User).filter(User.id==uid, User.ruolo=="operaio").with_for_update().first()
+    if not u: raise HTTPException(404,"Operaio non trovato")
+    verifica_mese_aperto(db,giorno)
+    pausa=data.get("pausa"); assenza=data.get("assenza"); ore=data.get("ore_assenza",0)
+    if type(pausa) is not int or not 0<=pausa<=1440 or assenza not in (None,"FERIE","MALATTIA","PERMESSO","FESTIVITA","ASSENZA") or type(ore) not in (int,float) or not 0<=ore<=24 or not str(data.get("motivo", "")).strip(): raise HTTPException(400,"Dati non validi")
+    g=db.query(GiornoPaghe).filter_by(operaio_id=uid,data=giorno).first()
+    if not g: g=GiornoPaghe(operaio_id=uid,data=giorno); db.add(g)
+    audit_paghe(db,admin,"RETTIFICA_GIORNO",f"{uid} {giorno}: {g.pausa}/{g.assenza}/{g.ore_assenza} -> {pausa}/{assenza}/{ore}; {data['motivo']}")
+    g.pausa=pausa;g.assenza=assenza;g.ore_assenza=ore if assenza else 0
+    turni=db.query(PresenzaGiornaliera).filter_by(operaio_id=uid,data=giorno,valida=True).all()
+    ripartisci_pausa_giornaliera([t for t in turni if t.ingresso and t.uscita],pausa)
+    db.commit();return {"ok":True}
+
+@app.get("/admin/paghe/config")
+def config_paghe(dal:date, al:date, db:Session=Depends(get_db),admin:User=Depends(require_admin)):
+    return {"giorni":[{"operaio_id":g.operaio_id,"data":g.data,"pausa":g.pausa,"assenza":g.assenza,"ore_assenza":g.ore_assenza} for g in db.query(GiornoPaghe).filter(GiornoPaghe.data>=dal,GiornoPaghe.data<=al).all()],"mesi":{m.mese:m.stato for m in db.query(MesePaghe).all()},"costi":[{"operaio_id":c.operaio_id,"mese":c.mese,"costo":c.costo} for c in db.query(CostoPaghe).all()]}
+
+@app.put("/admin/paghe/costo/{uid}/{mese}")
+def costo_paghe(uid:int,mese:str,data:dict,db:Session=Depends(get_db),admin:User=Depends(require_admin)):
+    try: giorno=date.fromisoformat(mese+"-01"); costo=float(data["costo"])
+    except (ValueError,KeyError,TypeError): raise HTTPException(400,"Costo o mese non valido")
+    verifica_mese_aperto(db,giorno)
+    if not db.get(User,uid) or not 0<=costo<=10000: raise HTTPException(400,"Costo non valido")
+    c=db.query(CostoPaghe).filter_by(operaio_id=uid,mese=mese).first()
+    if not c: c=CostoPaghe(operaio_id=uid,mese=mese);db.add(c)
+    audit_paghe(db,admin,"COSTO_PAGHE",f"{uid} {mese}: {c.costo} -> {costo}");c.costo=costo;db.commit();return {"ok":True}
+
+@app.put("/admin/paghe/mese/{mese}")
+def stato_paghe(mese:str,data:dict,db:Session=Depends(get_db),admin:User=Depends(require_admin)):
+    try: giorno=date.fromisoformat(mese+"-01")
+    except ValueError: raise HTTPException(400,"Mese non valido")
+    stato=data.get("stato")
+    if stato not in ("aperto","validato","chiuso") or not str(data.get("motivo", "")).strip(): raise HTTPException(400,"Stato o motivo non valido")
+    if stato in ("validato","chiuso"):
+        if giorno.strftime("%Y-%m")>=now_italy().strftime("%Y-%m"): raise HTTPException(409,"Il mese deve essere terminato")
+        if any(r["anomalia"] for r in registro_presenze(giorno,giorno.replace(day=monthrange(giorno.year,giorno.month)[1]),None,None,db,admin)): raise HTTPException(409,"Risolvere prima le anomalie")
+    m=db.get(MesePaghe,mese)
+    if not m: m=MesePaghe(mese=mese,stato="aperto");db.add(m)
+    audit_paghe(db,admin,"STATO_PAGHE",f"{mese}: {m.stato} -> {stato}; {data['motivo']}");m.stato=stato;db.commit();return {"ok":True}
